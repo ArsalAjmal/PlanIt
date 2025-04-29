@@ -33,6 +33,26 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-storage.js"></script>
+  
+  <script>
+    // Your web app's Firebase configuration
+    var firebaseConfig = {
+      apiKey: "AIzaSyBj_L0EKWBggCEF6LQu6eVNI3unU05zByA",
+      authDomain: "planit-13175.firebaseapp.com",
+      projectId: "planit-13175",
+      storageBucket: "planit-13175.firebasestorage.app",
+      messagingSenderId: "680306707405",
+      appId: "1:680306707405:web:7739fdc03cc99c6260d284"
+    };
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+  </script>
+  
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'controllers/login_controller.dart';
 import 'views/login_view.dart';
 import 'views/feedback_screen.dart';
@@ -13,7 +14,7 @@ import 'providers/city_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Set preferred orientations to portrait only
   SystemChrome.setPreferredOrientations([

@@ -6,9 +6,12 @@ import '../models/weather_model.dart';
 import '../services/weather_service.dart';
 import '../providers/city_provider.dart';
 import 'package:provider/provider.dart';
+import '../constants/app_colors.dart';
 
 class WeatherScreen extends StatefulWidget {
-  const WeatherScreen({super.key});
+  final bool isInBottomNavBar;
+
+  const WeatherScreen({super.key, this.isInBottomNavBar = true});
 
   @override
   _WeatherScreenState createState() => _WeatherScreenState();
@@ -123,118 +126,120 @@ class _WeatherScreenState extends State<WeatherScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFFFDE5),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: const BoxDecoration(
-                color: Color(0xFF9D9DCC),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    offset: Offset(0, 2),
-                    blurRadius: 4,
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const Text(
-                    'Weather Forecast',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
+    final Widget content = Column(
+      children: [
+        if (!widget.isInBottomNavBar)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: const BoxDecoration(
+              color: Color(0xFF9D9DCC),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black12,
+                  offset: Offset(0, 2),
+                  blurRadius: 4,
+                ),
+              ],
             ),
-            Container(
-              height: 1,
-              color: const Color(0xFF9D9DCC).withOpacity(0.3),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: TextField(
-                controller: _cityController,
-                decoration: InputDecoration(
-                  hintText: 'Enter city name',
-                  hintStyle: const TextStyle(color: Colors.grey),
-                  fillColor: Colors.white,
-                  filled: true,
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF9D9DCC),
-                      width: 1,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF9D9DCC),
-                      width: 2,
-                    ),
-                  ),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.search, color: Color(0xFF9D9DCC)),
-                    onPressed: () {
-                      if (_cityController.text.isNotEmpty) {
-                        _loadWeatherData(_cityController.text);
-                      }
-                    },
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                const Text(
+                  'Weather Forecast',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                onSubmitted: (value) {
-                  if (value.isNotEmpty) {
-                    _loadWeatherData(value);
+              ],
+            ),
+          ),
+        Container(height: 1, color: const Color(0xFF9D9DCC).withOpacity(0.3)),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: TextField(
+            controller: _cityController,
+            decoration: InputDecoration(
+              hintText: 'Enter city name',
+              hintStyle: const TextStyle(color: Colors.grey),
+              fillColor: Colors.white,
+              filled: true,
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(
+                  color: Color(0xFF9D9DCC),
+                  width: 1,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(
+                  color: Color(0xFF9D9DCC),
+                  width: 2,
+                ),
+              ),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.search, color: Color(0xFF9D9DCC)),
+                onPressed: () {
+                  if (_cityController.text.isNotEmpty) {
+                    _loadWeatherData(_cityController.text);
                   }
                 },
               ),
             ),
-            Expanded(
-              child:
-                  isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : error != null
-                      ? Center(child: Text(error!))
-                      : SingleChildScrollView(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (currentWeather != null) ...[
-                                _buildCurrentWeather(),
-                                const SizedBox(height: 24),
-                                const Text(
-                                  '5-Day Forecast',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF9D9DCC),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                _buildForecast(),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-            ),
-          ],
+            onSubmitted: (value) {
+              if (value.isNotEmpty) {
+                _loadWeatherData(value);
+              }
+            },
+          ),
         ),
-      ),
+        Expanded(
+          child:
+              isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : error != null
+                  ? Center(child: Text(error!))
+                  : SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (currentWeather != null) ...[
+                            _buildCurrentWeather(),
+                            const SizedBox(height: 24),
+                            const Text(
+                              '5-Day Forecast',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF9D9DCC),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildForecast(),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+        ),
+      ],
     );
+
+    if (widget.isInBottomNavBar) {
+      return content;
+    } else {
+      return Scaffold(
+        backgroundColor: AppColors.creamBackground,
+        body: SafeArea(child: content),
+      );
+    }
   }
 
   Widget _buildCurrentWeather() {

@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../models/portfolio_model.dart';
 import '../widgets/firestore_image.dart' as fw;
 import 'client/portfolio_response_screen.dart';
+import '../constants/app_colors.dart';
 
 class OrganizerSearchScreen extends StatelessWidget {
   final String clientId;
@@ -49,7 +50,7 @@ class OrganizerSearchView extends StatelessWidget {
     );
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFDE5),
+      backgroundColor: AppColors.creamBackground,
       body: SafeArea(
         child: Column(
           children: [

@@ -10,6 +10,7 @@ import 'organizer/portfolio_creation_screen.dart';
 import '../controllers/pending_orders_controller.dart';
 import '../models/response_model.dart';
 import '../services/portfolio_service.dart';
+import '../constants/app_colors.dart';
 
 class OrganizerHomeScreen extends StatefulWidget {
   const OrganizerHomeScreen({super.key});
@@ -81,7 +82,7 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen> {
     return SafeArea(
       child: Scaffold(
         key: _scaffoldKey,
-        backgroundColor: const Color(0xFFFFFDD0),
+        backgroundColor: AppColors.creamBackground,
         drawer: _buildDrawer(context),
         body: Column(
           children: [
@@ -95,95 +96,111 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen> {
   }
 
   Widget _buildDrawer(BuildContext context) {
+    final userData = _auth.currentUser;
+    final email = userData?.email ?? 'organizer@email.com';
+    final displayName = userData?.displayName ?? email.split('@')[0];
+    final avatarText =
+        displayName.isNotEmpty ? displayName[0].toUpperCase() : 'O';
+
     return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          DrawerHeader(
-            decoration: const BoxDecoration(color: Color(0xFF9D9DCC)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                const CircleAvatar(
-                  backgroundColor: Color(0xFFFFFDD0),
-                  radius: 30,
-                  child: Icon(Icons.person, size: 30, color: Color(0xFF9D9DCC)),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Organizer Menu',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+      child: Container(
+        color: AppColors.creamBackground,
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: const BoxDecoration(color: Color(0xFF9D9DCC)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  const CircleAvatar(
+                    backgroundColor: Color(0xFFFFFDD0),
+                    radius: 30,
+                    child: Icon(
+                      Icons.person,
+                      size: 30,
+                      color: Color(0xFF9D9DCC),
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 10),
+                  Text(
+                    'Organizer Menu',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.create, color: Color(0xFF9D9DCC)),
-            title: const Text('Create Portfolio'),
-            onTap: () {
-              Navigator.pop(context); // Close the drawer
-              final String organizerId = _auth.currentUser?.uid ?? '';
-              if (organizerId.isNotEmpty) {
+            ListTile(
+              leading: const Icon(Icons.create, color: Color(0xFF9D9DCC)),
+              title: const Text('Create Portfolio'),
+              onTap: () {
+                Navigator.pop(context); // Close the drawer
+                final String organizerId = _auth.currentUser?.uid ?? '';
+                if (organizerId.isNotEmpty) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (context) =>
+                              PortfolioCreationScreen(organizerId: organizerId),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'User not authenticated. Please log in again.',
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.account_circle,
+                color: Color(0xFF9D9DCC),
+              ),
+              title: const Text('My Account'),
+              onTap: () {
+                Navigator.pop(context); // Close the drawer
+                // Navigation will be added later
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.help_outline, color: Color(0xFF9D9DCC)),
+              title: const Text('Help Center'),
+              onTap: () {
+                Navigator.pop(context); // Close the drawer
+                // Navigation will be added later
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.policy, color: Color(0xFF9D9DCC)),
+              title: const Text('Terms and Policies'),
+              onTap: () {
+                Navigator.pop(context); // Close the drawer
+                // Navigation will be added later
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Color(0xFF9D9DCC)),
+              title: const Text('Logout'),
+              onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder:
-                        (context) =>
-                            PortfolioCreationScreen(organizerId: organizerId),
-                  ),
+                  MaterialPageRoute(builder: (context) => const LoginView()),
                 );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'User not authenticated. Please log in again.',
-                    ),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.account_circle, color: Color(0xFF9D9DCC)),
-            title: const Text('My Account'),
-            onTap: () {
-              Navigator.pop(context); // Close the drawer
-              // Navigation will be added later
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.help_outline, color: Color(0xFF9D9DCC)),
-            title: const Text('Help Center'),
-            onTap: () {
-              Navigator.pop(context); // Close the drawer
-              // Navigation will be added later
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.policy, color: Color(0xFF9D9DCC)),
-            title: const Text('Terms and Policies'),
-            onTap: () {
-              Navigator.pop(context); // Close the drawer
-              // Navigation will be added later
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout, color: Color(0xFF9D9DCC)),
-            title: const Text('Logout'),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginView()),
-              );
-            },
-          ),
-        ],
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -4,9 +4,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../models/response_model.dart';
 import '../models/review_model.dart';
+import '../constants/app_colors.dart';
 
 class FeedbackScreen extends StatefulWidget {
-  const FeedbackScreen({super.key});
+  final bool isInBottomNavBar;
+
+  const FeedbackScreen({super.key, this.isInBottomNavBar = true});
 
   @override
   State<FeedbackScreen> createState() => _FeedbackScreenState();
@@ -92,170 +95,171 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
+    final Widget content = DefaultTabController(
       length: 2,
-      child: Scaffold(
-        backgroundColor: const Color(0xFFFFFDE5),
-        body: SafeArea(
-          child: Column(
-            children: [
-              // Custom AppBar
-              Container(
-                color: const Color(0xFF9D9DCC),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 4.0,
-                  vertical: 8.0,
-                ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                    const Text(
-                      'Feedback',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.refresh, color: Colors.white),
-                      onPressed: _loadData,
-                    ),
-                  ],
-                ),
+      child: Column(
+        children: [
+          // Custom AppBar
+          if (!widget.isInBottomNavBar)
+            Container(
+              color: const Color(0xFF9D9DCC),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 4.0,
+                vertical: 8.0,
               ),
-              // Tab Bar
-              Container(
-                color: Colors.white,
-                child: TabBar(
-                  tabs: const [
-                    Tab(
-                      child: Text(
-                        'Pending Feedback',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const Text(
+                    'Feedback',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
                     ),
-                    Tab(
-                      child: Text(
-                        'My Ratings',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                  labelColor: const Color(0xFF9D9DCC),
-                  unselectedLabelColor: Color(0xFF9D9DCC).withAlpha(128),
-                  indicatorColor: const Color(0xFF9D9DCC),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.refresh, color: Colors.white),
+                    onPressed: _loadData,
+                  ),
+                ],
+              ),
+            ),
+          // Tab Bar
+          Container(
+            color: Colors.white,
+            child: TabBar(
+              tabs: const [
+                Tab(
+                  child: Text(
+                    'Pending Feedback',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
-              ),
-              // Tab Bar View with real data
-              Expanded(
-                child:
-                    _isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : TabBarView(
-                          children: [
-                            // Pending Feedback Tab
-                            _pendingFeedbackOrders.isEmpty
-                                ? Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: const [
-                                      Icon(
-                                        Icons.feedback_outlined,
-                                        size: 64,
-                                        color: Colors.grey,
-                                      ),
-                                      SizedBox(height: 16),
-                                      Text(
-                                        'No pending feedback',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                                : ListView.builder(
-                                  padding: const EdgeInsets.all(16),
-                                  itemCount: _pendingFeedbackOrders.length,
-                                  itemBuilder: (context, index) {
-                                    final order = _pendingFeedbackOrders[index];
-                                    return _buildOrderCard(
-                                      context,
-                                      order,
-                                      true,
-                                    );
-                                  },
-                                ),
-                            // My Ratings Tab
-                            _myReviews.isEmpty
-                                ? Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: const [
-                                      Icon(
-                                        Icons.star_border,
-                                        size: 64,
-                                        color: Colors.grey,
-                                      ),
-                                      SizedBox(height: 16),
-                                      Text(
-                                        'No ratings submitted yet',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                                : ListView.builder(
-                                  padding: const EdgeInsets.all(16),
-                                  itemCount: _myReviews.length,
-                                  itemBuilder: (context, index) {
-                                    final review = _myReviews[index];
-                                    // Find the order associated with this review
-                                    final order = _completedOrders.firstWhere(
-                                      (o) => o.id == review.responseId,
-                                      orElse:
-                                          () => ResponseModel(
-                                            id: review.responseId,
-                                            portfolioId: review.portfolioId,
-                                            organizerId: review.organizerId,
-                                            clientId: review.clientId,
-                                            clientName: review.clientName,
-                                            eventName: "Unknown Event",
-                                            eventType: "Unknown",
-                                            eventDate: DateTime.now(),
-                                            budget: 0,
-                                            primaryColor: "",
-                                            secondaryColor: "",
-                                            needsPhotographer: false,
-                                            additionalNotes: "",
-                                            status: "completed",
-                                            createdAt: review.createdAt,
-                                          ),
-                                    );
-                                    return _buildRatedOrderCard(
-                                      context,
-                                      order,
-                                      review,
-                                    );
-                                  },
-                                ),
-                          ],
-                        ),
-              ),
-            ],
+                Tab(
+                  child: Text(
+                    'My Ratings',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+              labelColor: const Color(0xFF9D9DCC),
+              unselectedLabelColor: Color(0xFF9D9DCC).withAlpha(128),
+              indicatorColor: const Color(0xFF9D9DCC),
+            ),
           ),
-        ),
+          // Tab Bar View with real data
+          Expanded(
+            child:
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : TabBarView(
+                      children: [
+                        // Pending Feedback Tab
+                        _pendingFeedbackOrders.isEmpty
+                            ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  Icon(
+                                    Icons.feedback_outlined,
+                                    size: 64,
+                                    color: Colors.grey,
+                                  ),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'No pending feedback',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                            : ListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: _pendingFeedbackOrders.length,
+                              itemBuilder: (context, index) {
+                                final order = _pendingFeedbackOrders[index];
+                                return _buildOrderCard(context, order, true);
+                              },
+                            ),
+                        // My Ratings Tab
+                        _myReviews.isEmpty
+                            ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  Icon(
+                                    Icons.star_border,
+                                    size: 64,
+                                    color: Colors.grey,
+                                  ),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'No ratings submitted yet',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                            : ListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: _myReviews.length,
+                              itemBuilder: (context, index) {
+                                final review = _myReviews[index];
+                                // Find the order associated with this review
+                                final order = _completedOrders.firstWhere(
+                                  (o) => o.id == review.responseId,
+                                  orElse:
+                                      () => ResponseModel(
+                                        id: review.responseId,
+                                        portfolioId: review.portfolioId,
+                                        organizerId: review.organizerId,
+                                        clientId: review.clientId,
+                                        clientName: review.clientName,
+                                        eventName: "Unknown Event",
+                                        eventType: "Unknown",
+                                        eventDate: DateTime.now(),
+                                        budget: 0,
+                                        primaryColor: "",
+                                        secondaryColor: "",
+                                        needsPhotographer: false,
+                                        additionalNotes: "",
+                                        status: "completed",
+                                        createdAt: review.createdAt,
+                                      ),
+                                );
+                                return _buildRatedOrderCard(
+                                  context,
+                                  order,
+                                  review,
+                                );
+                              },
+                            ),
+                      ],
+                    ),
+          ),
+        ],
       ),
     );
+
+    if (widget.isInBottomNavBar) {
+      return content;
+    } else {
+      return Scaffold(
+        backgroundColor: AppColors.creamBackground,
+        body: SafeArea(child: content),
+      );
+    }
   }
 
   Widget _buildOrderCard(

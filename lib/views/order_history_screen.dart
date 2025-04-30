@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../controllers/order_history_controller.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/response_model.dart';
+import '../constants/app_colors.dart';
 
 class OrderHistoryScreen extends StatefulWidget {
   const OrderHistoryScreen({super.key});
@@ -57,7 +58,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFDE5),
+      backgroundColor: AppColors.creamBackground,
       body: SafeArea(
         child: Column(
           children: [

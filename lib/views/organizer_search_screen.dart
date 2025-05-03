@@ -9,6 +9,7 @@ import '../models/portfolio_model.dart';
 import '../widgets/firestore_image.dart' as fw;
 import 'client/portfolio_response_screen.dart';
 import '../constants/app_colors.dart';
+import 'dart:async';
 
 class OrganizerSearchScreen extends StatelessWidget {
   final String clientId;
@@ -29,7 +30,7 @@ class OrganizerSearchScreen extends StatelessWidget {
   }
 }
 
-class OrganizerSearchView extends StatelessWidget {
+class OrganizerSearchView extends StatefulWidget {
   final String clientId;
   final String clientName;
 
@@ -40,11 +41,51 @@ class OrganizerSearchView extends StatelessWidget {
   });
 
   @override
+  State<OrganizerSearchView> createState() => _OrganizerSearchViewState();
+}
+
+class _OrganizerSearchViewState extends State<OrganizerSearchView> {
+  // Timer for promotional offers
+  Timer? _promotionalTimer;
+  int _remainingSeconds = 15 * 60; // 15 minutes in seconds
+
+  @override
+  void initState() {
+    super.initState();
+    // Start the promotional timer
+    _startPromoTimer();
+  }
+
+  @override
+  void dispose() {
+    _promotionalTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startPromoTimer() {
+    _promotionalTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        if (_remainingSeconds > 0) {
+          _remainingSeconds--;
+        } else {
+          timer.cancel();
+        }
+      });
+    });
+  }
+
+  String _formatTime(int seconds) {
+    int minutes = seconds ~/ 60;
+    int remainingSeconds = seconds % 60;
+    return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Set status bar color to match background
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
-        statusBarColor: Color(0xFFFFFDE5),
+        statusBarColor: Colors.white,
         statusBarIconBrightness: Brightness.dark,
       ),
     );
@@ -55,10 +96,16 @@ class OrganizerSearchView extends StatelessWidget {
         child: Column(
           children: [
             Container(
-              color: const Color(0xFF9D9DCC),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 4.0,
-                vertical: 8.0,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: const BoxDecoration(
+                color: Color(0xFF9D9DCC),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black12,
+                    offset: Offset(0, 2),
+                    blurRadius: 4,
+                  ),
+                ],
               ),
               child: Row(
                 children: [
@@ -70,8 +117,8 @@ class OrganizerSearchView extends StatelessWidget {
                     'Search',
                     style: TextStyle(
                       color: Colors.white,
-                      fontWeight: FontWeight.bold,
                       fontSize: 20,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                   const Spacer(),
@@ -79,6 +126,7 @@ class OrganizerSearchView extends StatelessWidget {
               ),
             ),
             _buildSearchBar(context),
+            _buildPromotionalOffers(),
             Consumer<OrganizerSearchController>(
               builder: (context, controller, child) {
                 if (controller.isLoading) {
@@ -99,88 +147,166 @@ class OrganizerSearchView extends StatelessWidget {
                 if (!hasResults && hasSearchQuery) {
                   return Expanded(
                     child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.search_off,
-                            size: 64,
-                            color: Color(0xFF9D9DCC),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No results found for "${controller.searchQuery}"',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.search_off,
+                              size: 64,
+                              color: Color(0xFF9D9DCC),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Try different keywords or filters',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        ],
+                            const SizedBox(height: 16),
+                            Text(
+                              'No results found for "${controller.searchQuery}"',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Colors.black87,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Try different keywords or filters',
+                              style: TextStyle(
+                                color: Colors.black87,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   );
                 }
 
+                // Use a builder for better performance with lists
                 return Expanded(
-                  child: ListView(
+                  child: ListView.builder(
                     padding: const EdgeInsets.all(16),
-                    children: [
-                      if (hasPortfolios) ...[
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 8.0),
-                          child: Text(
-                            'Portfolios',
-                            style: TextStyle(
-                              color: Color(0xFF9D9DCC),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
+                    // Calculate the total item count with headers
+                    itemCount:
+                        (hasPortfolios ? 1 + controller.portfolios.length : 0) +
+                        (hasOrganizers ? 1 + controller.organizers.length : 0) +
+                        (!hasResults && !hasSearchQuery ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      // Portfolio section
+                      if (hasPortfolios) {
+                        if (index == 0) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8.0),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 3,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black87,
+                                    borderRadius: BorderRadius.circular(1.5),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Portfolios',
+                                  style: TextStyle(
+                                    color: Colors.black87,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ),
-                        ...controller.portfolios.map(
-                          (portfolio) =>
-                              _buildPortfolioCard(context, portfolio),
-                        ),
-                        const SizedBox(height: 24),
-                      ],
+                          );
+                        }
 
-                      if (hasOrganizers) ...[
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 8.0),
-                          child: Text(
-                            'Organizers',
-                            style: TextStyle(
-                              color: Color(0xFF9D9DCC),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
+                        if (index < 1 + controller.portfolios.length) {
+                          return _buildPortfolioCard(
+                            context,
+                            controller.portfolios[index - 1],
+                          );
+                        }
+
+                        // If we have both sections, add spacing after portfolios
+                        if (hasOrganizers &&
+                            index == 1 + controller.portfolios.length) {
+                          return const SizedBox(height: 24);
+                        }
+                      }
+
+                      // Organizer section - adjust index based on portfolio section
+                      final organizerStartIndex =
+                          hasPortfolios
+                              ? 1 +
+                                  controller.portfolios.length +
+                                  (hasOrganizers ? 1 : 0)
+                              : 0;
+
+                      if (hasOrganizers) {
+                        if (index == organizerStartIndex) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8.0),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 3,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black87,
+                                    borderRadius: BorderRadius.circular(1.5),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Organizers',
+                                  style: TextStyle(
+                                    color: Colors.black87,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ),
-                        ...controller.organizers.map(
-                          (organizer) =>
-                              _buildOrganizerCard(context, organizer),
-                        ),
-                      ],
+                          );
+                        }
 
-                      if (!hasResults && !hasSearchQuery)
-                        const Center(
+                        if (index > organizerStartIndex &&
+                            index <
+                                organizerStartIndex +
+                                    1 +
+                                    controller.organizers.length) {
+                          return _buildOrganizerCard(
+                            context,
+                            controller.organizers[index -
+                                organizerStartIndex -
+                                1],
+                          );
+                        }
+                      }
+
+                      // Empty results message
+                      if (!hasResults && !hasSearchQuery) {
+                        return const Center(
                           child: Padding(
-                            padding: EdgeInsets.only(top: 32.0),
+                            padding: EdgeInsets.symmetric(
+                              vertical: 32.0,
+                              horizontal: 24.0,
+                            ),
                             child: Text(
                               'Search for organizers and portfolios',
+                              textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: Colors.grey,
+                                color: Colors.black87,
                                 fontSize: 16,
                               ),
                             ),
                           ),
-                        ),
-                    ],
+                        );
+                      }
+
+                      return const SizedBox.shrink();
+                    },
                   ),
                 );
               },
@@ -195,13 +321,10 @@ class OrganizerSearchView extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: TextField(
-        style: const TextStyle(color: Color(0xFF9D9DCC), fontSize: 16),
+        style: const TextStyle(color: Colors.black87, fontSize: 16),
         decoration: InputDecoration(
           hintText: 'Search organizers...',
-          hintStyle: TextStyle(
-            color: const Color(0xFF9D9DCC).withOpacity(0.6),
-            fontSize: 16,
-          ),
+          hintStyle: TextStyle(color: Colors.grey[600], fontSize: 16),
           prefixIcon: const Icon(Icons.search, color: Color(0xFF9D9DCC)),
           suffixIcon: TextButton.icon(
             onPressed: () => _showFilterDialog(context),
@@ -216,18 +339,22 @@ class OrganizerSearchView extends StatelessWidget {
             ),
           ),
           filled: true,
-          fillColor: Colors.white,
+          fillColor: Colors.grey.withOpacity(0.1),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF9D9DCC)),
+            borderRadius: BorderRadius.circular(30),
+            borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF9D9DCC)),
+            borderRadius: BorderRadius.circular(30),
+            borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF9D9DCC), width: 2),
+            borderRadius: BorderRadius.circular(30),
+            borderSide: const BorderSide(color: Color(0xFF9D9DCC), width: 1),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 4,
+            horizontal: 20,
           ),
         ),
         onChanged: (value) {
@@ -264,7 +391,7 @@ class OrganizerSearchView extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               organizer.eventType,
-              style: const TextStyle(color: Color(0xFF9D9DCC), fontSize: 14),
+              style: const TextStyle(color: Colors.black87, fontSize: 14),
             ),
             Text(
               'Budget: ${currencyFormat.format(organizer.minBudget)} - ${currencyFormat.format(organizer.maxBudget)}',
@@ -278,7 +405,7 @@ class OrganizerSearchView extends StatelessWidget {
             Text(
               '${organizer.rating}/5',
               style: const TextStyle(
-                color: Color(0xFF9D9DCC),
+                color: Colors.black87,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -341,7 +468,7 @@ class OrganizerSearchView extends StatelessWidget {
                         const Text(
                           'Filter Options',
                           style: TextStyle(
-                            color: Color(0xFF9D9DCC),
+                            color: Colors.black87,
                             fontWeight: FontWeight.bold,
                             fontSize: 22,
                           ),
@@ -358,20 +485,29 @@ class OrganizerSearchView extends StatelessWidget {
                     const SizedBox(height: 20),
                     Container(
                       padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF9D9DCC).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Budget Range',
-                            style: TextStyle(
-                              color: Color(0xFF9D9DCC),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
+                          Row(
+                            children: [
+                              Container(
+                                width: 3,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  color: Colors.black87,
+                                  borderRadius: BorderRadius.circular(1.5),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Budget Range',
+                                style: TextStyle(
+                                  color: Colors.black87,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 16),
                           Row(
@@ -386,7 +522,7 @@ class OrganizerSearchView extends StatelessWidget {
                                       const Text(
                                         'Min Budget',
                                         style: TextStyle(
-                                          color: Color(0xFF9D9DCC),
+                                          color: Color(0xFF757575),
                                           fontSize: 14,
                                         ),
                                       ),
@@ -394,41 +530,46 @@ class OrganizerSearchView extends StatelessWidget {
                                       TextField(
                                         controller: minBudgetController,
                                         keyboardType: TextInputType.number,
+                                        style: const TextStyle(
+                                          color: Color(0xFF757575),
+                                        ),
                                         decoration: InputDecoration(
                                           prefixText: 'PKR ',
-                                          prefixStyle: TextStyle(
-                                            color: const Color(
-                                              0xFF9D9DCC,
-                                            ).withOpacity(0.5),
+                                          prefixStyle: const TextStyle(
+                                            color: Colors.black87,
+                                            fontWeight: FontWeight.w500,
                                           ),
                                           filled: true,
-                                          fillColor: Colors.white,
+                                          fillColor: Colors.grey.withOpacity(
+                                            0.1,
+                                          ),
                                           contentPadding:
                                               const EdgeInsets.symmetric(
-                                                horizontal: 20,
-                                                vertical: 16,
+                                                horizontal: 12,
+                                                vertical: 10,
                                               ),
                                           border: OutlineInputBorder(
                                             borderRadius: BorderRadius.circular(
-                                              8,
+                                              12,
                                             ),
                                             borderSide: BorderSide.none,
                                           ),
                                           enabledBorder: OutlineInputBorder(
                                             borderRadius: BorderRadius.circular(
-                                              8,
+                                              12,
                                             ),
                                             borderSide: BorderSide.none,
                                           ),
                                           focusedBorder: OutlineInputBorder(
                                             borderRadius: BorderRadius.circular(
-                                              8,
+                                              12,
                                             ),
                                             borderSide: const BorderSide(
                                               color: Color(0xFF9D9DCC),
-                                              width: 2,
+                                              width: 1,
                                             ),
                                           ),
+                                          isDense: true,
                                         ),
                                         onChanged: (value) {
                                           setState(() {
@@ -452,7 +593,7 @@ class OrganizerSearchView extends StatelessWidget {
                                       const Text(
                                         'Max Budget',
                                         style: TextStyle(
-                                          color: Color(0xFF9D9DCC),
+                                          color: Color(0xFF757575),
                                           fontSize: 14,
                                         ),
                                       ),
@@ -460,41 +601,46 @@ class OrganizerSearchView extends StatelessWidget {
                                       TextField(
                                         controller: maxBudgetController,
                                         keyboardType: TextInputType.number,
+                                        style: const TextStyle(
+                                          color: Color(0xFF757575),
+                                        ),
                                         decoration: InputDecoration(
                                           prefixText: 'PKR ',
-                                          prefixStyle: TextStyle(
-                                            color: const Color(
-                                              0xFF9D9DCC,
-                                            ).withOpacity(0.5),
+                                          prefixStyle: const TextStyle(
+                                            color: Colors.black87,
+                                            fontWeight: FontWeight.w500,
                                           ),
                                           filled: true,
-                                          fillColor: Colors.white,
+                                          fillColor: Colors.grey.withOpacity(
+                                            0.1,
+                                          ),
                                           contentPadding:
                                               const EdgeInsets.symmetric(
-                                                horizontal: 20,
-                                                vertical: 16,
+                                                horizontal: 12,
+                                                vertical: 10,
                                               ),
                                           border: OutlineInputBorder(
                                             borderRadius: BorderRadius.circular(
-                                              8,
+                                              12,
                                             ),
                                             borderSide: BorderSide.none,
                                           ),
                                           enabledBorder: OutlineInputBorder(
                                             borderRadius: BorderRadius.circular(
-                                              8,
+                                              12,
                                             ),
                                             borderSide: BorderSide.none,
                                           ),
                                           focusedBorder: OutlineInputBorder(
                                             borderRadius: BorderRadius.circular(
-                                              8,
+                                              12,
                                             ),
                                             borderSide: const BorderSide(
                                               color: Color(0xFF9D9DCC),
-                                              width: 2,
+                                              width: 1,
                                             ),
                                           ),
+                                          isDense: true,
                                         ),
                                         onChanged: (value) {
                                           setState(() {
@@ -536,38 +682,54 @@ class OrganizerSearchView extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 20),
+                    const Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: Color(0xFFEEEEEE),
+                    ),
+                    const SizedBox(height: 20),
                     Container(
                       padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF9D9DCC).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Event Type',
-                            style: TextStyle(
-                              color: Color(0xFF9D9DCC),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
+                          Row(
+                            children: [
+                              Container(
+                                width: 3,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  color: Colors.black87,
+                                  borderRadius: BorderRadius.circular(1.5),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Event Type',
+                                style: TextStyle(
+                                  color: Colors.black87,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 12),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
+                              color: Colors.grey.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                             child: DropdownButton<String>(
                               value: selectedEventType,
                               isExpanded: true,
                               underline: const SizedBox(),
+                              dropdownColor: Colors.white,
                               hint: const Text(
                                 'Select Event Type',
                                 style: TextStyle(
-                                  color: Color(0xFF9D9DCC),
+                                  color: Color(0xFF757575),
                                   fontSize: 14,
                                 ),
                               ),
@@ -583,7 +745,7 @@ class OrganizerSearchView extends StatelessWidget {
                                       child: Text(
                                         value,
                                         style: const TextStyle(
-                                          color: Color(0xFF9D9DCC),
+                                          color: Colors.black87,
                                           fontSize: 14,
                                         ),
                                       ),
@@ -640,6 +802,217 @@ class OrganizerSearchView extends StatelessWidget {
     );
   }
 
+  Widget _buildPromotionalOffers() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Promotional timer banner
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF1F1), // Light pink background
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 1,
+                blurRadius: 2,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Clock icon
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.2),
+                      spreadRadius: 1,
+                      blurRadius: 2,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Image.asset(
+                  'assets/images/clock_icon.png',
+                  width: 24,
+                  height: 24,
+                  errorBuilder:
+                      (context, error, stackTrace) =>
+                          const Icon(Icons.timer, color: Colors.pink, size: 24),
+                ),
+              ),
+
+              // Text content
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Save 25%',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.pink,
+                      ),
+                    ),
+                    Text(
+                      'Hurry! Limited time offers',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Timer display
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.pink,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _formatTime(_remainingSeconds),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Horizontal promotional cards
+        SizedBox(
+          height: 180,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            children: [
+              _buildPromotionalCard(
+                'Up to 30% off',
+                'assets/images/promo1.jpg',
+                Colors.purple.shade800,
+                subtitle: 'on all events',
+              ),
+              _buildPromotionalCard(
+                'New Services',
+                'assets/images/promo2.jpg',
+                Colors.pink,
+                subtitle: 'Birthday Events',
+              ),
+              _buildPromotionalCard(
+                'Special Offer',
+                'assets/images/promo3.jpg',
+                Colors.pink.shade700,
+                subtitle: '20% Off Photographers',
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPromotionalCard(
+    String title,
+    String imagePath,
+    Color color, {
+    String? subtitle,
+  }) {
+    return Container(
+      width: 280,
+      margin: const EdgeInsets.only(right: 16),
+      key: ValueKey(imagePath),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color, color.withOpacity(0.8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          // Background image with fallback
+          Positioned.fill(
+            child: Image.asset(
+              imagePath,
+              fit: BoxFit.cover,
+              // Use a cacheWidth to optimize memory usage
+              cacheWidth: 560,
+              errorBuilder:
+                  (context, error, stackTrace) =>
+                      Container(color: color.withOpacity(0.2)),
+            ),
+          ),
+
+          // Text overlay
+          Positioned(
+            top: 20,
+            left: 20,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 28,
+                  ),
+                ),
+                if (subtitle != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 22,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // T&Cs text at bottom
+          const Positioned(
+            bottom: 10,
+            left: 20,
+            child: Text(
+              'T&Cs apply.',
+              style: TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPortfolioCard(BuildContext context, PortfolioModel portfolio) {
     final currencyFormat = NumberFormat.currency(
       symbol: 'PKR ',
@@ -651,6 +1024,7 @@ class OrganizerSearchView extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 4,
+      key: ValueKey('portfolio_${portfolio.id}'),
       child: InkWell(
         onTap: () {
           Navigator.push(
@@ -659,8 +1033,8 @@ class OrganizerSearchView extends StatelessWidget {
               builder:
                   (context) => PortfolioResponseScreen(
                     portfolio: portfolio,
-                    clientId: clientId,
-                    clientName: clientName,
+                    clientId: widget.clientId,
+                    clientName: widget.clientName,
                   ),
             ),
           );
@@ -675,6 +1049,7 @@ class OrganizerSearchView extends StatelessWidget {
                   topRight: Radius.circular(12),
                 ),
                 child: Container(
+                  key: ValueKey('img_${portfolio.id}'),
                   height: 140,
                   width: double.infinity,
                   child: fw.FirestoreImage(
@@ -691,7 +1066,7 @@ class OrganizerSearchView extends StatelessWidget {
                   Text(
                     portfolio.title,
                     style: const TextStyle(
-                      color: Color(0xFF9D9DCC),
+                      color: Colors.black87,
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
                     ),
@@ -737,7 +1112,7 @@ class OrganizerSearchView extends StatelessWidget {
                       Text(
                         portfolio.rating.toStringAsFixed(1),
                         style: const TextStyle(
-                          color: Color(0xFF9D9DCC),
+                          color: Colors.black87,
                           fontWeight: FontWeight.bold,
                         ),
                       ),

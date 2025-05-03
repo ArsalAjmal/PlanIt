@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'dart:async';
 import '../../models/response_model.dart';
 import '../../services/portfolio_service.dart';
+import '../feedback_screen.dart';
 
 class PortfolioResponsesScreen extends StatefulWidget {
   final String organizerId;
@@ -91,212 +92,379 @@ class _PortfolioResponsesScreenState extends State<PortfolioResponsesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Portfolio Responses'),
-        backgroundColor: const Color(0xFF9D9DCC),
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: DropdownButtonFormField<String>(
-              value: _selectedStatus,
-              decoration: const InputDecoration(
-                labelText: 'Filter by Status',
-                border: OutlineInputBorder(),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: const BoxDecoration(
+                color: Color(0xFF9D9DCC),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black12,
+                    offset: Offset(0, 2),
+                    blurRadius: 4,
+                  ),
+                ],
               ),
-              items:
-                  ['All', 'Pending', 'Accepted', 'Rejected'].map((status) {
-                    return DropdownMenuItem(value: status, child: Text(status));
-                  }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedStatus = value!;
-                });
-              },
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const Text(
+                    'Portfolio Responses',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                ],
+              ),
             ),
-          ),
-          Expanded(
-            child: StreamBuilder<List<ResponseModel>>(
-              stream: _portfolioService.getResponsesForOrganizer(
-                widget.organizerId,
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: DropdownButtonFormField<String>(
+                value: _selectedStatus,
+                decoration: const InputDecoration(
+                  labelText: 'Filter by Status',
+                  border: OutlineInputBorder(),
+                ),
+                items:
+                    ['All', 'Pending', 'Accepted', 'Rejected'].map((status) {
+                      return DropdownMenuItem(
+                        value: status,
+                        child: Text(status),
+                      );
+                    }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedStatus = value!;
+                  });
+                },
               ),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+            ),
+            Expanded(
+              child: StreamBuilder<List<ResponseModel>>(
+                stream: _portfolioService.getResponsesForOrganizer(
+                  widget.organizerId,
+                ),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
+                  if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  }
 
-                final responses = snapshot.data ?? [];
-                final filteredResponses =
-                    _selectedStatus == 'All'
-                        ? responses
-                        : responses
-                            .where(
-                              (r) =>
-                                  r.status.toLowerCase() ==
-                                  _selectedStatus.toLowerCase(),
-                            )
-                            .toList();
+                  final responses = snapshot.data ?? [];
+                  final filteredResponses =
+                      _selectedStatus == 'All'
+                          ? responses
+                          : responses
+                              .where(
+                                (r) =>
+                                    r.status.toLowerCase() ==
+                                    _selectedStatus.toLowerCase(),
+                              )
+                              .toList();
 
-                if (filteredResponses.isEmpty) {
-                  return const Center(child: Text('No responses found'));
-                }
+                  if (filteredResponses.isEmpty) {
+                    return const Center(child: Text('No responses found'));
+                  }
 
-                return ListView.builder(
-                  padding: const EdgeInsets.all(8),
-                  itemCount: filteredResponses.length,
-                  itemBuilder: (context, index) {
-                    final response = filteredResponses[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  response.eventName,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _getStatusColor(response.status),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    response.status,
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(8),
+                    itemCount: filteredResponses.length,
+                    itemBuilder: (context, index) {
+                      final response = filteredResponses[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    response.eventName,
                                     style: const TextStyle(
-                                      color: Colors.white,
+                                      fontSize: 18,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Client: ${response.clientName}',
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Event Type: ${response.eventType}',
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Event Date: ${DateFormat('MMM dd, yyyy').format(response.eventDate)}',
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                            if (response.status == 'accepted') ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                'Time Remaining: ${_getTimeRemaining(response.eventDate)}',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue,
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 8),
-                            Text(
-                              'Budget: PKR ${response.budget}',
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    color: Color(
-                                      int.parse(response.primaryColor),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
                                     ),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    color: Color(
-                                      int.parse(response.secondaryColor),
+                                    decoration: BoxDecoration(
+                                      color: _getStatusColor(response.status),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Photographer: ${response.needsPhotographer ? 'Required' : 'Not Required'}',
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                            if (response.additionalNotes.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                'Notes: ${response.additionalNotes}',
-                                style: const TextStyle(fontSize: 16),
-                              ),
-                            ],
-                            if (response.status == 'pending') ...[
-                              const SizedBox(height: 16),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  TextButton(
-                                    onPressed:
-                                        () => _updateResponseStatus(
-                                          response,
-                                          'rejected',
-                                        ),
-                                    child: const Text(
-                                      'Reject',
-                                      style: TextStyle(color: Colors.red),
+                                    child: Text(
+                                      response.status,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ElevatedButton(
-                                    onPressed:
-                                        () => _updateResponseStatus(
-                                          response,
-                                          'accepted',
-                                        ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF9D9DCC),
-                                    ),
-                                    child: const Text('Accept'),
                                   ),
                                 ],
                               ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Client: ${response.clientName}',
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Event Type: ${response.eventType}',
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Event Date: ${DateFormat('MMM dd, yyyy').format(response.eventDate)}',
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                              if (response.status == 'accepted') ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Time Remaining: ${_getTimeRemaining(response.eventDate)}',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 8),
+                              Text(
+                                'Budget: PKR ${response.budget}',
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: Color(
+                                        int.parse(response.primaryColor),
+                                      ),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: Color(
+                                        int.parse(response.secondaryColor),
+                                      ),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Photographer: ${response.needsPhotographer ? 'Required' : 'Not Required'}',
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                              if (response.additionalNotes.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Notes: ${response.additionalNotes}',
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                              ],
+                              const SizedBox(height: 16),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 16,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.grey.shade200,
+                                  ),
+                                ),
+                                child: Column(
+                                  children: [
+                                    const Divider(
+                                      height: 1,
+                                      thickness: 1,
+                                      color: Colors.grey,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    if (response.status == 'accepted')
+                                      GestureDetector(
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder:
+                                                  (context) =>
+                                                      const FeedbackScreen(
+                                                        isInBottomNavBar: false,
+                                                      ),
+                                            ),
+                                          );
+                                        },
+                                        child: Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 10,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            gradient: const LinearGradient(
+                                              colors: [
+                                                Color(0xFF9D9DCC),
+                                                Color(0xFF7575A8),
+                                              ],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: const Color(
+                                                  0xFF9D9DCC,
+                                                ).withOpacity(0.3),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: const [
+                                              Icon(
+                                                Icons.star,
+                                                color: Colors.white,
+                                                size: 18,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                'Rate & Review',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              if (response.status == 'pending') ...[
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    TextButton(
+                                      onPressed:
+                                          () => _updateResponseStatus(
+                                            response,
+                                            'rejected',
+                                          ),
+                                      child: const Text(
+                                        'Reject',
+                                        style: TextStyle(color: Colors.red),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ElevatedButton(
+                                      onPressed:
+                                          () => _updateResponseStatus(
+                                            response,
+                                            'accepted',
+                                          ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(
+                                          0xFF9D9DCC,
+                                        ),
+                                      ),
+                                      child: const Text('Accept'),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                              if (response.status == 'accepted') ...[
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        onTap: () {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Chat will be implemented soon',
+                                              ),
+                                              duration: Duration(seconds: 2),
+                                            ),
+                                          );
+                                        },
+                                        borderRadius: BorderRadius.circular(20),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF9D9DCC),
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(
+                                                  0.2,
+                                                ),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
+                                          child: const Icon(
+                                            Icons.chat,
+                                            color: Colors.white,
+                                            size: 16,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                );
-              },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

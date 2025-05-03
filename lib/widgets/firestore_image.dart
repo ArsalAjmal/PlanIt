@@ -3,7 +3,24 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
-class FirestoreImage extends StatelessWidget {
+// A simple cache to store decoded images
+class _ImageCache {
+  static final Map<String, Uint8List> _cache = {};
+
+  static Uint8List? getImage(String key) {
+    return _cache[key];
+  }
+
+  static void cacheImage(String key, Uint8List data) {
+    _cache[key] = data;
+  }
+
+  static bool hasImage(String key) {
+    return _cache.containsKey(key);
+  }
+}
+
+class FirestoreImage extends StatefulWidget {
   final String imageUrl;
   final BoxFit fit;
   final double? width;
@@ -18,54 +35,152 @@ class FirestoreImage extends StatelessWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    // Check if it's a Firestore reference
-    if (imageUrl.startsWith('firestore:')) {
-      final String docId = imageUrl.substring(10); // Remove 'firestore:' prefix
+  State<FirestoreImage> createState() => _FirestoreImageState();
+}
 
-      return FutureBuilder<DocumentSnapshot>(
-        future:
-            FirebaseFirestore.instance
+class _FirestoreImageState extends State<FirestoreImage> {
+  Uint8List? _imageData;
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadImage();
+  }
+
+  @override
+  void didUpdateWidget(FirestoreImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrl != widget.imageUrl) {
+      _loadImage();
+    }
+  }
+
+  Future<void> _loadImage() async {
+    if (widget.imageUrl.isEmpty) {
+      setState(() {
+        _errorMessage = 'No image URL provided';
+      });
+      return;
+    }
+
+    // Check if it's a Firestore reference
+    if (widget.imageUrl.startsWith('firestore:')) {
+      final String docId = widget.imageUrl.substring(10);
+
+      // Check if image is already in memory cache
+      if (_ImageCache.hasImage(docId)) {
+        setState(() {
+          _imageData = _ImageCache.getImage(docId);
+          _isLoading = false;
+        });
+        return;
+      }
+
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+
+      try {
+        final doc =
+            await FirebaseFirestore.instance
                 .collection('portfolio_images')
                 .doc(docId)
-                .get(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+                .get();
 
-          if (snapshot.hasError) {
-            return Center(child: Icon(Icons.error, color: Colors.red));
-          }
+        if (!doc.exists) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'Image not found';
+          });
+          return;
+        }
 
-          if (!snapshot.hasData || !snapshot.data!.exists) {
-            return Center(child: Icon(Icons.broken_image, color: Colors.grey));
-          }
+        final data = doc.data() as Map<String, dynamic>;
+        final String? base64Image = data['image'] as String?;
 
-          final data = snapshot.data!.data() as Map<String, dynamic>;
-          final String? base64Image = data['image'] as String?;
+        if (base64Image == null) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'Invalid image data';
+          });
+          return;
+        }
 
-          if (base64Image == null) {
-            return Center(
-              child: Icon(Icons.image_not_supported, color: Colors.grey),
-            );
-          }
+        try {
+          final bytes = base64Decode(base64Image);
+          // Store in cache
+          _ImageCache.cacheImage(docId, bytes);
 
-          try {
-            final Uint8List bytes = base64Decode(base64Image);
-            return Image.memory(bytes, fit: fit, width: width, height: height);
-          } catch (e) {
-            return Center(child: Icon(Icons.error, color: Colors.red));
+          if (mounted) {
+            setState(() {
+              _imageData = bytes;
+              _isLoading = false;
+            });
           }
-        },
-      );
+        } catch (e) {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _errorMessage = 'Failed to decode image';
+            });
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'Error loading image: $e';
+          });
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // For Firestore images
+    if (widget.imageUrl.startsWith('firestore:')) {
+      if (_isLoading) {
+        return const Center(child: CircularProgressIndicator());
+      }
+
+      if (_errorMessage != null) {
+        return Center(child: Icon(Icons.error, color: Colors.red));
+      }
+
+      if (_imageData != null) {
+        return Image.memory(
+          _imageData!,
+          fit: widget.fit,
+          width: widget.width,
+          height: widget.height,
+        );
+      }
+
+      return const Center(child: CircularProgressIndicator());
     } else {
-      // Handle regular URLs
+      // Handle regular URLs with caching
       return Image.network(
-        imageUrl,
-        fit: fit,
-        width: width,
-        height: height,
+        widget.imageUrl,
+        fit: widget.fit,
+        width: widget.width,
+        height: widget.height,
+        cacheWidth: 400, // Add caching for images
+        cacheHeight: 300,
+        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+          if (wasSynchronouslyLoaded || frame != null) {
+            return child;
+          }
+          return AnimatedOpacity(
+            opacity: frame == null ? 0 : 1,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+            child: child,
+          );
+        },
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) return child;
           return Center(

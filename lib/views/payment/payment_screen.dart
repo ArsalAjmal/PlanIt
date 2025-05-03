@@ -4,6 +4,7 @@ import '../../models/portfolio_model.dart';
 import '../../models/response_model.dart';
 import '../../services/portfolio_service.dart';
 import '../../views/client_home_screen.dart';
+import '../../constants/app_colors.dart';
 import 'package:uuid/uuid.dart';
 
 class PaymentScreen extends StatefulWidget {
@@ -196,215 +197,247 @@ class _PaymentScreenState extends State<PaymentScreen> {
     // Set status bar color to match background
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
-        statusBarColor: Color(0xFFFFFDE5),
+        statusBarColor: AppColors.creamBackground,
         statusBarIconBrightness: Brightness.dark,
       ),
     );
 
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: const Color(0xFFFFFDD0),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF9D9DCC),
-          elevation: 0,
-          title: const Text(
-            'Payment',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 20,
+    return Scaffold(
+      backgroundColor: AppColors.creamBackground,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: const BoxDecoration(
+                color: Color(0xFF9D9DCC),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black12,
+                    offset: Offset(0, 2),
+                    blurRadius: 4,
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const Text(
+                    'Payment',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                ],
+              ),
             ),
-          ),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
-        body:
-            _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Expanded(
+              child:
+                  _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'Total Amount:',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Text(
+                                      'PKR ${widget.totalAmount.toStringAsFixed(0)}',
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF9D9DCC),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 24),
                               const Text(
-                                'Total Amount:',
+                                'Credit Card Details',
                                 style: TextStyle(
-                                  fontSize: 18,
+                                  fontSize: 20,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              Text(
-                                'PKR ${widget.totalAmount.toStringAsFixed(0)}',
+                              const SizedBox(height: 16),
+                              TextFormField(
+                                controller: _cardNumberController,
+                                decoration: InputDecoration(
+                                  labelText: 'Card Number',
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  labelStyle: const TextStyle(
+                                    color: Color(0xFF9D9DCC),
+                                  ),
+                                  hintText: '1234 5678 9012 3456',
+                                  hintStyle: TextStyle(
+                                    color: const Color(
+                                      0xFF9D9DCC,
+                                    ).withOpacity(0.6),
+                                    fontSize: 16,
+                                  ),
+                                  prefixIcon: const Icon(
+                                    Icons.credit_card,
+                                    color: Color(0xFF9D9DCC),
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
                                 style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF9D9DCC),
+                                  color: Color(0xFF6B6B8D),
+                                  fontSize: 16,
+                                ),
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  LengthLimitingTextInputFormatter(16),
+                                  _CardNumberFormatter(),
+                                ],
+                                validator: _validateCardNumber,
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: _expiryController,
+                                      decoration: InputDecoration(
+                                        labelText: 'Expiry Date',
+                                        filled: true,
+                                        fillColor: Colors.white,
+                                        labelStyle: const TextStyle(
+                                          color: Color(0xFF9D9DCC),
+                                        ),
+                                        hintText: 'MM/YY',
+                                        hintStyle: TextStyle(
+                                          color: const Color(
+                                            0xFF9D9DCC,
+                                          ).withOpacity(0.6),
+                                          fontSize: 16,
+                                        ),
+                                        prefixIcon: const Icon(
+                                          Icons.date_range,
+                                          color: Color(0xFF9D9DCC),
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                      style: const TextStyle(
+                                        color: Color(0xFF6B6B8D),
+                                        fontSize: 16,
+                                      ),
+                                      keyboardType: TextInputType.number,
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                        LengthLimitingTextInputFormatter(4),
+                                        _ExpiryDateFormatter(),
+                                      ],
+                                      validator: _validateExpiry,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: _cvvController,
+                                      decoration: InputDecoration(
+                                        labelText: 'CVV',
+                                        filled: true,
+                                        fillColor: Colors.white,
+                                        labelStyle: const TextStyle(
+                                          color: Color(0xFF9D9DCC),
+                                        ),
+                                        hintText: '123',
+                                        hintStyle: TextStyle(
+                                          color: const Color(
+                                            0xFF9D9DCC,
+                                          ).withOpacity(0.6),
+                                          fontSize: 16,
+                                        ),
+                                        prefixIcon: const Icon(
+                                          Icons.security,
+                                          color: Color(0xFF9D9DCC),
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                      style: const TextStyle(
+                                        color: Color(0xFF6B6B8D),
+                                        fontSize: 16,
+                                      ),
+                                      keyboardType: TextInputType.number,
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                        LengthLimitingTextInputFormatter(3),
+                                      ],
+                                      validator: _validateCVV,
+                                      obscureText: true,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 32),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: _processPayment,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF9D9DCC),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Confirm Payment',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 24),
-                        const Text(
-                          'Credit Card Details',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _cardNumberController,
-                          decoration: InputDecoration(
-                            labelText: 'Card Number',
-                            filled: true,
-                            fillColor: Colors.white,
-                            labelStyle: const TextStyle(
-                              color: Color(0xFF9D9DCC),
-                            ),
-                            hintText: '1234 5678 9012 3456',
-                            hintStyle: TextStyle(
-                              color: const Color(0xFF9D9DCC).withOpacity(0.6),
-                              fontSize: 16,
-                            ),
-                            prefixIcon: const Icon(
-                              Icons.credit_card,
-                              color: Color(0xFF9D9DCC),
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          style: const TextStyle(
-                            color: Color(0xFF6B6B8D),
-                            fontSize: 16,
-                          ),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(16),
-                            _CardNumberFormatter(),
-                          ],
-                          validator: _validateCardNumber,
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: _expiryController,
-                                decoration: InputDecoration(
-                                  labelText: 'Expiry Date',
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  labelStyle: const TextStyle(
-                                    color: Color(0xFF9D9DCC),
-                                  ),
-                                  hintText: 'MM/YY',
-                                  hintStyle: TextStyle(
-                                    color: const Color(
-                                      0xFF9D9DCC,
-                                    ).withOpacity(0.6),
-                                    fontSize: 16,
-                                  ),
-                                  prefixIcon: const Icon(
-                                    Icons.date_range,
-                                    color: Color(0xFF9D9DCC),
-                                  ),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                style: const TextStyle(
-                                  color: Color(0xFF6B6B8D),
-                                  fontSize: 16,
-                                ),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                  LengthLimitingTextInputFormatter(4),
-                                  _ExpiryDateFormatter(),
-                                ],
-                                validator: _validateExpiry,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: TextFormField(
-                                controller: _cvvController,
-                                decoration: InputDecoration(
-                                  labelText: 'CVV',
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  labelStyle: const TextStyle(
-                                    color: Color(0xFF9D9DCC),
-                                  ),
-                                  hintText: '123',
-                                  hintStyle: TextStyle(
-                                    color: const Color(
-                                      0xFF9D9DCC,
-                                    ).withOpacity(0.6),
-                                    fontSize: 16,
-                                  ),
-                                  prefixIcon: const Icon(
-                                    Icons.security,
-                                    color: Color(0xFF9D9DCC),
-                                  ),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                style: const TextStyle(
-                                  color: Color(0xFF6B6B8D),
-                                  fontSize: 16,
-                                ),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                  LengthLimitingTextInputFormatter(3),
-                                ],
-                                validator: _validateCVV,
-                                obscureText: true,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 32),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: _processPayment,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF9D9DCC),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                            ),
-                            child: const Text(
-                              'Confirm Payment',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                      ),
+            ),
+          ],
+        ),
       ),
     );
   }

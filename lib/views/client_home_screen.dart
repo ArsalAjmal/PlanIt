@@ -14,6 +14,7 @@ import '../services/weather_service.dart';
 import '../models/weather_model.dart';
 import '../providers/city_provider.dart';
 import 'dart:math';
+import '../constants/app_colors.dart';
 
 class ClientHomeScreen extends StatefulWidget {
   const ClientHomeScreen({super.key});
@@ -127,8 +128,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: const Color(0xFFFFFFF0),
+      backgroundColor: AppColors.creamBackground,
       drawer: _buildDrawer(context),
+      floatingActionButton: _buildChatFab(context),
       body: SafeArea(
         child: Stack(
           children: [
@@ -149,14 +151,27 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
                         const SizedBox(height: 12),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                          child: Text(
-                            'Services',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                              letterSpacing: 0.5,
-                            ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 3,
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  color: Colors.black87,
+                                  borderRadius: BorderRadius.circular(1.5),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Services',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -182,8 +197,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
 
     return Drawer(
       child: Container(
-        color: const Color(0xFFFFFFF0),
+        color: Colors.white,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             UserAccountsDrawerHeader(
               decoration: const BoxDecoration(
@@ -221,6 +237,22 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
+                  // Account section
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: 20,
+                      top: 16,
+                      bottom: 8,
+                    ),
+                    child: Text(
+                      'Account',
+                      style: TextStyle(
+                        color: Colors.black87,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
                   _buildDrawerTile(
                     context,
                     icon: Icons.account_circle,
@@ -230,51 +262,183 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
                       // Navigation will be added later
                     },
                   ),
+                  // Divider
+                  Padding(
+                    padding: const EdgeInsets.only(left: 20, right: 20),
+                    child: Divider(color: Colors.grey[200], height: 1),
+                  ),
                   _buildDrawerTile(
                     context,
-                    icon: Icons.help_outline,
-                    title: 'Help Center',
+                    icon: Icons.people,
+                    title: 'Invite friends',
                     onTap: () {
                       Navigator.pop(context);
                       // Navigation will be added later
                     },
+                  ),
+
+                  // Perks section
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: 20,
+                      top: 24,
+                      bottom: 8,
+                    ),
+                    child: Text(
+                      'Perks for you',
+                      style: TextStyle(
+                        color: Colors.black87,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.star,
+                    title: 'Become a pro',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Navigation will be added later
+                    },
+                  ),
+                  // Divider
+                  Padding(
+                    padding: const EdgeInsets.only(left: 20, right: 20),
+                    child: Divider(color: Colors.grey[200], height: 1),
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.emoji_events,
+                    title: 'PlanIt rewards',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Navigation will be added later
+                    },
+                  ),
+                  // Divider
+                  Padding(
+                    padding: const EdgeInsets.only(left: 20, right: 20),
+                    child: Divider(color: Colors.grey[200], height: 1),
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.card_giftcard,
+                    title: 'Vouchers',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Navigation will be added later
+                    },
+                  ),
+
+                  // General section
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: 20,
+                      top: 24,
+                      bottom: 8,
+                    ),
+                    child: Text(
+                      'General',
+                      style: TextStyle(
+                        color: Colors.black87,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.help_outline,
+                    title: 'Help center',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Navigation will be added later
+                    },
+                  ),
+                  // Divider
+                  Padding(
+                    padding: const EdgeInsets.only(left: 20, right: 20),
+                    child: Divider(color: Colors.grey[200], height: 1),
                   ),
                   _buildDrawerTile(
                     context,
                     icon: Icons.policy,
-                    title: 'Terms and Policies',
+                    title: 'Terms & policies',
                     onTap: () {
                       Navigator.pop(context);
                       // Navigation will be added later
                     },
                   ),
-                  const Divider(
-                    color: Color(0xFF9D9DCC),
-                    thickness: 0.5,
-                    indent: 16,
-                    endIndent: 16,
-                  ),
-                  _buildDrawerTile(
-                    context,
-                    icon: Icons.logout,
-                    title: 'Logout',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LoginView(),
+
+                  // Logout button
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Container(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const LoginView(),
+                            ),
+                          );
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: BorderSide(color: Colors.grey[300]!),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
-                      );
-                    },
+                        child: const Text(
+                          'Log out',
+                          style: TextStyle(
+                            color: Colors.black87,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Version info with beta tag
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0, top: 8.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Version 1.0.0',
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'BETA - Multan only',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(16),
-              child: const Text(
-                'PlanIt v1.0.0',
-                style: TextStyle(color: Color(0xFF9D9DCC), fontSize: 12),
               ),
             ),
           ],
@@ -290,20 +454,24 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Icon(icon, color: const Color(0xFF9D9DCC)),
+      leading: Icon(icon, color: const Color(0xFF9D9DCC), size: 22),
       title: Text(
         title,
         style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: Color(0xFF333333),
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+          color: Colors.black87,
         ),
       ),
+      trailing: Icon(
+        Icons.arrow_forward_ios,
+        size: 14,
+        color: Colors.grey[400],
+      ),
       onTap: onTap,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       contentPadding: const EdgeInsets.symmetric(
-        horizontal: 24.0,
-        vertical: 4.0,
+        horizontal: 20.0,
+        vertical: 2.0,
       ),
       dense: true,
     );
@@ -312,18 +480,10 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
   Widget _buildAppBar(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF9D9DCC),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(20),
-          bottomRight: Radius.circular(20),
-        ),
+      decoration: const BoxDecoration(
+        color: Color(0xFF9D9DCC),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
+          BoxShadow(color: Colors.black12, offset: Offset(0, 2), blurRadius: 4),
         ],
       ),
       child: Row(
@@ -334,18 +494,16 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
               _scaffoldKey.currentState?.openDrawer();
             },
           ),
-          const Expanded(
-            child: Text(
-              'PlanIt',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 22,
-                letterSpacing: 0.5,
-              ),
-              textAlign: TextAlign.center,
+          const Spacer(),
+          const Text(
+            'PlanIt',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
           ),
+          const Spacer(),
           Stack(
             alignment: Alignment.center,
             children: [
@@ -417,14 +575,15 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
                   decoration: const BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
+                      topLeft: Radius.circular(28),
+                      topRight: Radius.circular(28),
                     ),
                   ),
                   child: Column(
                     children: [
+                      // Drag handle
                       Container(
-                        margin: const EdgeInsets.only(top: 8),
+                        margin: const EdgeInsets.only(top: 12, bottom: 4),
                         width: 40,
                         height: 5,
                         decoration: BoxDecoration(
@@ -433,17 +592,36 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
                         ),
                       ),
                       Padding(
-                        padding: const EdgeInsets.all(16.0),
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'Notifications',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF9D9DCC),
-                              ),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(
+                                      0xFF9D9DCC,
+                                    ).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.notifications_none_rounded,
+                                    color: Color(0xFF9D9DCC),
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'Notifications',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ],
                             ),
                             TextButton(
                               onPressed: () {
@@ -453,67 +631,216 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
                                 });
                                 Navigator.pop(context);
                               },
-                              child: const Text(
-                                'Mark all as read',
-                                style: TextStyle(color: Color(0xFF9D9DCC)),
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.black54,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 4,
+                                ),
+                                minimumSize: Size.zero,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.check_circle_outline,
+                                    size: 16,
+                                    color: Colors.black54,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Text(
+                                    'Mark all as read',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
                       ),
+
+                      // Filter tabs
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                        child: Container(
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF9D9DCC),
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(
+                                          0xFF9D9DCC,
+                                        ).withOpacity(0.2),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      'All',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Center(
+                                  child: Text(
+                                    'Events',
+                                    style: TextStyle(
+                                      color: Colors.black54,
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Center(
+                                  child: Text(
+                                    'Alerts',
+                                    style: TextStyle(
+                                      color: Colors.black54,
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
                       const Divider(),
                       Expanded(
-                        child: ListView(
-                          controller: controller,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          children: [
-                            _buildNotificationItem(
-                              title: 'Event Reminder',
-                              message:
-                                  'Your "Summer Wedding" event is coming up in just 1 day!',
-                              time: '10 min ago',
-                              icon: Icons.event,
-                              isUnread: true,
-                            ),
-                            _buildNotificationItem(
-                              title: 'Weather Alert',
-                              message:
-                                  'There\'s a 70% chance of rain on your upcoming event day.',
-                              time: '1 hour ago',
-                              icon: Icons.wb_cloudy,
-                              isUnread: true,
-                            ),
-                            _buildNotificationItem(
-                              title: 'New Feature',
-                              message:
-                                  'Check out our new vendor collaboration features!',
-                              time: '2 hours ago',
-                              icon: Icons.new_releases,
-                              isUnread: true,
-                            ),
-                            _buildNotificationItem(
-                              title: 'Payment Confirmed',
-                              message:
-                                  'Your payment for Venue Services has been confirmed.',
-                              time: '1 day ago',
-                              icon: Icons.payment,
-                              isUnread: false,
-                            ),
-                            _buildNotificationItem(
-                              title: 'Feedback Request',
-                              message:
-                                  'Please rate your experience with our catering service.',
-                              time: '2 days ago',
-                              icon: Icons.star,
-                              isUnread: false,
-                            ),
-                          ],
-                        ),
+                        child:
+                            _notificationCount > 0
+                                ? ListView(
+                                  controller: controller,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                  ),
+                                  children: [
+                                    _buildNotificationItem(
+                                      title: 'Event Reminder',
+                                      message:
+                                          'Your "Summer Wedding" event is coming up in just 1 day!',
+                                      time: '10 min ago',
+                                      icon: Icons.event,
+                                      isUnread: true,
+                                      category: 'Event',
+                                      actionText: 'View Event',
+                                    ),
+                                    _buildNotificationItem(
+                                      title: 'Weather Alert',
+                                      message:
+                                          'There\'s a 70% chance of rain on your upcoming event day.',
+                                      time: '1 hour ago',
+                                      icon: Icons.wb_cloudy,
+                                      isUnread: true,
+                                      category: 'Alert',
+                                      actionText: 'Check Forecast',
+                                    ),
+                                    _buildNotificationItem(
+                                      title: 'New Feature',
+                                      message:
+                                          'Check out our new vendor collaboration features!',
+                                      time: '2 hours ago',
+                                      icon: Icons.new_releases,
+                                      isUnread: true,
+                                      category: 'Update',
+                                      actionText: 'Explore',
+                                    ),
+                                    _buildNotificationItem(
+                                      title: 'Payment Confirmed',
+                                      message:
+                                          'Your payment for Venue Services has been confirmed.',
+                                      time: '1 day ago',
+                                      icon: Icons.payment,
+                                      isUnread: false,
+                                      category: 'Payment',
+                                      actionText: 'View Receipt',
+                                    ),
+                                    _buildNotificationItem(
+                                      title: 'Feedback Request',
+                                      message:
+                                          'Please rate your experience with our catering service.',
+                                      time: '2 days ago',
+                                      icon: Icons.star,
+                                      isUnread: false,
+                                      category: 'Feedback',
+                                      actionText: 'Leave Review',
+                                    ),
+                                  ],
+                                )
+                                : _buildEmptyNotifications(),
                       ),
                     ],
                   ),
                 ),
           ),
+    );
+  }
+
+  Widget _buildEmptyNotifications() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.notifications_off_outlined,
+              size: 60,
+              color: Colors.grey.shade400,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'No notifications yet',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              'We\'ll notify you about event updates, reminders, and special offers.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade600,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -524,73 +851,207 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
     required String time,
     required IconData icon,
     required bool isUnread,
+    required String category,
+    required String actionText,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color:
-            isUnread ? const Color(0xFF9D9DCC).withOpacity(0.08) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color:
-              isUnread
-                  ? const Color(0xFF9D9DCC).withOpacity(0.3)
-                  : Colors.grey.withOpacity(0.2),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Stack(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color:
-                  isUnread
-                      ? const Color(0xFF9D9DCC).withOpacity(0.2)
-                      : Colors.grey.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color:
+                    isUnread
+                        ? const Color(0xFF9D9DCC).withOpacity(0.3)
+                        : Colors.grey.withOpacity(0.1),
+                width: isUnread ? 1.5 : 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color:
+                      isUnread
+                          ? const Color(0xFF9D9DCC).withOpacity(0.1)
+                          : Colors.grey.withOpacity(0.05),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                  spreadRadius: 0,
+                ),
+              ],
             ),
-            child: Icon(
-              icon,
-              color: isUnread ? const Color(0xFF9D9DCC) : Colors.grey,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontWeight:
-                            isUnread ? FontWeight.bold : FontWeight.w500,
-                        fontSize: 16,
-                        color: Colors.black87,
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        gradient:
+                            isUnread
+                                ? LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    const Color(0xFF9D9DCC),
+                                    const Color(0xFF7575A8),
+                                  ],
+                                )
+                                : null,
+                        color: isUnread ? null : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Icon(
+                        icon,
+                        color: isUnread ? Colors.white : Colors.grey,
+                        size: 24,
                       ),
                     ),
-                    Text(
-                      time,
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _getCategoryColor(
+                                    category,
+                                  ).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  category,
+                                  style: TextStyle(
+                                    color: _getCategoryColor(category),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                time,
+                                style: TextStyle(
+                                  color: Colors.grey.shade500,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            title,
+                            style: TextStyle(
+                              fontWeight:
+                                  isUnread ? FontWeight.bold : FontWeight.w600,
+                              fontSize: 16,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            message,
+                            style: TextStyle(
+                              color: Colors.black54,
+                              fontSize: 14,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  message,
-                  style: TextStyle(color: Colors.black54, fontSize: 14),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          // Dismiss notification
+                          Navigator.pop(context);
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          foregroundColor: Colors.black54,
+                          side: BorderSide(color: Colors.grey.shade300),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Dismiss'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          // Action specific to the notification
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          backgroundColor: const Color(0xFF9D9DCC),
+                          foregroundColor: Colors.white,
+                          elevation: isUnread ? 2 : 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(actionText),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
+
+          // Unread indicator
+          if (isUnread)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  Color _getCategoryColor(String category) {
+    switch (category.toLowerCase()) {
+      case 'event':
+        return const Color(0xFF9D9DCC);
+      case 'alert':
+        return Colors.orange;
+      case 'update':
+        return Colors.blue;
+      case 'payment':
+        return Colors.green;
+      case 'feedback':
+        return Colors.amber;
+      default:
+        return Colors.grey;
+    }
   }
 
   Widget _buildCompactWeatherAlert(BuildContext context) {
@@ -989,7 +1450,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
         },
       },
       {
-        'title': 'Weather\nUpdates',
+        'title': 'Weather\nForecast',
         'icon': Icons.cloud,
         'color': const Color(0xFF9D9DCC),
         'onTap': () {
@@ -1177,6 +1638,330 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
   // New widget for pattern background instead of blobs
   Widget _buildPatternBackground() {
     return CustomPaint(painter: PatternPainter());
+  }
+
+  Widget _buildChatFab(BuildContext context) {
+    return FloatingActionButton(
+      onPressed: () {
+        _showChatDialog(context);
+      },
+      backgroundColor: const Color(0xFF9D9DCC),
+      elevation: 4,
+      tooltip: "Chat with support",
+      child: const Icon(Icons.chat, color: Colors.white),
+    );
+  }
+
+  void _showChatDialog(BuildContext context) {
+    final TextEditingController _messageController = TextEditingController();
+    bool _isSending = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder:
+          (context) => StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return Container(
+                height: MediaQuery.of(context).size.height * 0.75,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(25),
+                    topRight: Radius.circular(25),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    // Chat header
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 15,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF9D9DCC),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(25),
+                          topRight: Radius.circular(25),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.3),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.support_agent,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              const Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Customer Support',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  Text(
+                                    'We usually respond within an hour',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.white),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Chat message area
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        color: Colors.grey.shade50,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              // System welcome message
+                              _buildChatBubble(
+                                message: "Hello! How can we help you today?",
+                                isUser: false,
+                                time: "Just now",
+                              ),
+
+                              // Placeholder for future messages
+                              // Messages will be added here from Firebase
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Message input area
+                    Container(
+                      padding: EdgeInsets.only(
+                        left: 16,
+                        right: 16,
+                        top: 10,
+                        bottom: MediaQuery.of(context).viewInsets.bottom + 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, -2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _messageController,
+                              decoration: InputDecoration(
+                                hintText: "Type your message...",
+                                hintStyle: TextStyle(
+                                  color: Colors.grey.shade400,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(25),
+                                  borderSide: BorderSide.none,
+                                ),
+                                filled: true,
+                                fillColor: Colors.grey.shade100,
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 10,
+                                ),
+                              ),
+                              maxLines: 3,
+                              minLines: 1,
+                              textCapitalization: TextCapitalization.sentences,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () {
+                              if (_messageController.text.trim().isNotEmpty &&
+                                  !_isSending) {
+                                setState(() {
+                                  _isSending = true;
+                                });
+
+                                // Simulate sending message
+                                Future.delayed(Duration(seconds: 1), () {
+                                  // Here is where you would integrate with Firebase
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text("Support ticket sent!"),
+                                      backgroundColor: Color(0xFF9D9DCC),
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+
+                                  setState(() {
+                                    _isSending = false;
+                                  });
+
+                                  Navigator.pop(context);
+                                });
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color:
+                                    _messageController.text.trim().isEmpty ||
+                                            _isSending
+                                        ? Colors.grey.shade300
+                                        : const Color(0xFF9D9DCC),
+                                shape: BoxShape.circle,
+                              ),
+                              child:
+                                  _isSending
+                                      ? SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.white,
+                                              ),
+                                        ),
+                                      )
+                                      : Icon(
+                                        Icons.send_rounded,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+    );
+  }
+
+  Widget _buildChatBubble({
+    required String message,
+    required bool isUser,
+    required String time,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        mainAxisAlignment:
+            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!isUser)
+            Container(
+              height: 32,
+              width: 32,
+              margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF9D9DCC),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.support_agent,
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
+
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isUser ? const Color(0xFF9D9DCC) : Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(isUser ? 16 : 0),
+                  topRight: Radius.circular(isUser ? 0 : 16),
+                  bottomLeft: const Radius.circular(16),
+                  bottomRight: const Radius.circular(16),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 5,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    message,
+                    style: TextStyle(
+                      color: isUser ? Colors.white : Colors.black87,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    time,
+                    style: TextStyle(
+                      color: isUser ? Colors.white70 : Colors.black54,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          if (isUser)
+            Container(
+              height: 32,
+              width: 32,
+              margin: const EdgeInsets.only(left: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF9D9DCC),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.person, color: Colors.white, size: 16),
+            ),
+        ],
+      ),
+    );
   }
 }
 

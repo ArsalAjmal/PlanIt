@@ -5,111 +5,75 @@ import '../models/weather_model.dart';
 
 class WeatherService {
   final String apiKey = '2047e1716f7332e749e131ae27499df3';
+  final String baseUrl = 'https://api.openweathermap.org/data/2.5';
 
   Future<List<ForecastDay>> getFiveDayForecast(String city) async {
     try {
-      // First get coordinates for the city
-      final geoResponse = await http.get(
-        Uri.parse(
-          'http://api.openweathermap.org/geo/1.0/direct?q=$city&limit=1&appid=$apiKey',
-        ),
-      );
-
-      if (geoResponse.statusCode != 200) {
-        throw Exception('Failed to get city coordinates');
-      }
-
-      final geoData = json.decode(geoResponse.body);
-      if (geoData.isEmpty) {
-        throw Exception('City not found');
-      }
-
-      final lat = geoData[0]['lat'];
-      final lon = geoData[0]['lon'];
-
-      // Get daily forecast using coordinates
       final response = await http.get(
-        Uri.parse(
-          'https://api.openweathermap.org/data/2.5/forecast/daily?lat=$lat&lon=$lon&cnt=5&appid=$apiKey&units=metric',
-        ),
+        Uri.parse('$baseUrl/forecast?q=$city&units=metric&appid=$apiKey'),
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        List<ForecastDay> forecast = [];
+        final List<dynamic> list = data['list'];
 
-        for (var item in data['list']) {
-          forecast.add(
-            ForecastDay(
-              date: DateTime.fromMillisecondsSinceEpoch(item['dt'] * 1000),
+        // Group forecasts by day
+        final Map<String, ForecastDay> dailyForecasts = {};
+
+        for (var item in list) {
+          final date = DateTime.fromMillisecondsSinceEpoch(item['dt'] * 1000);
+          final day = DateFormat('yyyy-MM-dd').format(date);
+
+          if (!dailyForecasts.containsKey(day)) {
+            dailyForecasts[day] = ForecastDay(
+              date: date,
+              maxTemp: item['main']['temp_max'].toDouble(),
+              minTemp: item['main']['temp_min'].toDouble(),
               condition: item['weather'][0]['description'],
               icon: item['weather'][0]['icon'],
-              maxTemp: (item['temp']['max'] as num).toDouble(),
-              minTemp: (item['temp']['min'] as num).toDouble(),
-            ),
-          );
-        }
-
-        return forecast;
-      } else {
-        // Fallback to 5-day/3-hour forecast if daily forecast fails
-        final fallbackResponse = await http.get(
-          Uri.parse(
-            'https://api.openweathermap.org/data/2.5/forecast?lat=$lat&lon=$lon&appid=$apiKey&units=metric',
-          ),
-        );
-
-        if (fallbackResponse.statusCode == 200) {
-          final data = json.decode(fallbackResponse.body);
-          List<ForecastDay> forecast = [];
-          Map<String, List<dynamic>> dailyData = {};
-
-          // Group by date
-          for (var item in data['list']) {
-            DateTime date = DateTime.fromMillisecondsSinceEpoch(
-              item['dt'] * 1000,
+              humidity: item['main']['humidity'],
+              windSpeed: item['wind']['speed'].toDouble(),
+              clouds: item['clouds']['all'],
             );
-            String dateKey = DateFormat('yyyy-MM-dd').format(date);
-
-            if (!dailyData.containsKey(dateKey)) {
-              dailyData[dateKey] = [];
-            }
-            dailyData[dateKey]!.add(item);
-          }
-
-          // Get daily min/max
-          dailyData.forEach((dateKey, items) {
-            if (forecast.length < 5) {
-              double maxTemp = -double.infinity;
-              double minTemp = double.infinity;
-              String condition = items[0]['weather'][0]['description'];
-              String icon = items[0]['weather'][0]['icon'];
-
-              for (var item in items) {
-                double temp = (item['main']['temp'] as num).toDouble();
-                if (temp > maxTemp) maxTemp = temp;
-                if (temp < minTemp) minTemp = temp;
-              }
-
-              forecast.add(
-                ForecastDay(
-                  date: DateTime.parse(dateKey),
-                  condition: condition,
-                  icon: icon,
-                  maxTemp: maxTemp,
-                  minTemp: minTemp,
-                ),
+          } else {
+            final existing = dailyForecasts[day]!;
+            if (item['main']['temp_max'] > existing.maxTemp) {
+              dailyForecasts[day] = ForecastDay(
+                date: existing.date,
+                maxTemp: item['main']['temp_max'].toDouble(),
+                minTemp: existing.minTemp,
+                condition: existing.condition,
+                icon: existing.icon,
+                humidity: existing.humidity,
+                windSpeed: existing.windSpeed,
+                clouds: existing.clouds,
               );
             }
-          });
-
-          forecast.sort((a, b) => a.date.compareTo(b.date));
-          return forecast;
-        } else {
-          throw Exception('Failed to load forecast data');
+            if (item['main']['temp_min'] < existing.minTemp) {
+              dailyForecasts[day] = ForecastDay(
+                date: existing.date,
+                maxTemp: existing.maxTemp,
+                minTemp: item['main']['temp_min'].toDouble(),
+                condition: existing.condition,
+                icon: existing.icon,
+                humidity: existing.humidity,
+                windSpeed: existing.windSpeed,
+                clouds: existing.clouds,
+              );
+            }
+          }
         }
+
+        // Take first 5 days
+        final result = dailyForecasts.values.toList();
+        result.sort((a, b) => a.date.compareTo(b.date));
+        return result.take(5).toList();
+      } else {
+        print('Error fetching weather data: ${response.statusCode}');
+        throw Exception('Failed to load forecast data');
       }
     } catch (e) {
+      print('Error in getFiveDayForecast: $e');
       throw Exception('Failed to load forecast data');
     }
   }

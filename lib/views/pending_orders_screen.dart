@@ -109,93 +109,140 @@ class _PendingOrdersScreenState extends State<PendingOrdersScreen> {
     }
 
     if (_order == null) {
-      return SafeArea(
-        child: Scaffold(
-          backgroundColor: const Color(0xFFFFFDD0),
-          appBar: AppBar(
-            backgroundColor: const Color(0xFF9D9DCC),
-            elevation: 0,
-            title: const Text(
-              'Order Details',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
+      return Scaffold(
+        backgroundColor: const Color(0xFFFFFDD0),
+        body: SafeArea(
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF9D9DCC),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black12,
+                      offset: Offset(0, 2),
+                      blurRadius: 4,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const Text(
+                      'Order Details',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                  ],
+                ),
               ),
-            ),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
-            ),
+              const Expanded(child: Center(child: Text('Order not found'))),
+            ],
           ),
-          body: const Center(child: Text('Order not found')),
         ),
       );
     }
 
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: const Color(0xFFFFFDD0),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF9D9DCC),
-          elevation: 0,
-          title: Text(
-            'Order Details - ${_order!.id.substring(0, 8)}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 20,
-            ),
-          ),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildDetailCard('Event Information', [
-                'Name: ${_order!.eventName}',
-                'Type: ${_order!.eventType}',
-                'Date: ${_order!.eventDate.toString().substring(0, 10)}',
-                'Budget: PKR ${_order!.budget.toStringAsFixed(0)}',
-                'Client: ${_order!.clientName}',
-              ]),
-              const SizedBox(height: 16),
-              if (_order!.clientResponse.isNotEmpty) ...[
-                _buildMessageCard('Client Message', _order!.clientResponse),
-                const SizedBox(height: 16),
-              ],
-              _buildDetailCard('Additional Information', [
-                'Primary Color: ${_order!.primaryColor}',
-                'Secondary Color: ${_order!.secondaryColor}',
-                'Photographer Needed: ${_order!.needsPhotographer ? 'Yes' : 'No'}',
-                'Notes: ${_order!.additionalNotes}',
-              ]),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _markAsCompleted,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF9D9DCC),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+    return Scaffold(
+      backgroundColor: const Color(0xFFFFFDD0),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: const BoxDecoration(
+                color: Color(0xFF9D9DCC),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black12,
+                    offset: Offset(0, 2),
+                    blurRadius: 4,
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  Text(
+                    'Order Details - ${_order!.id.substring(0, 8)}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  child: const Text(
-                    'Mark as Complete',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                  const Spacer(),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildDetailCard('Event Information', [
+                      'Name: ${_order!.eventName}',
+                      'Type: ${_order!.eventType}',
+                      'Date: ${_order!.eventDate.toString().substring(0, 10)}',
+                      'Budget: PKR ${_order!.budget.toStringAsFixed(0)}',
+                      'Client: ${_order!.clientName}',
+                    ]),
+                    const SizedBox(height: 16),
+                    if (_order!.clientResponse.isNotEmpty) ...[
+                      _buildMessageCard(
+                        'Client Message',
+                        _order!.clientResponse,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    _buildDetailCard('Additional Information', [
+                      'Primary Color: ${_order!.primaryColor}',
+                      'Secondary Color: ${_order!.secondaryColor}',
+                      'Photographer Needed: ${_order!.needsPhotographer ? 'Yes' : 'No'}',
+                      'Notes: ${_order!.additionalNotes}',
+                    ]),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: _markAsCompleted,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF9D9DCC),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Mark as Complete',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

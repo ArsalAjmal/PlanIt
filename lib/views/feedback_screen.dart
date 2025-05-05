@@ -68,8 +68,29 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
               .map((doc) => ReviewModel.fromMap(doc.data()))
               .toList();
 
+      // Get active reviews (ones that still exist in Firebase)
+      final activeReviewIds = reviewsSnapshot.docs.map((doc) => doc.id).toSet();
+
+      // Filter out orders that have deleted reviews by checking if their response ID exists
+      // This ensures deleted reviews don't reappear
+      final ordersWithActiveOrNoReviews =
+          completedOrders.where((order) {
+            // Check if any review exists for this order
+            final hasReview = reviews.any(
+              (review) => review.responseId == order.id,
+            );
+
+            // Keep if no review exists or if review is still active in Firebase
+            return !hasReview ||
+                activeReviewIds.contains(
+                  reviews
+                      .firstWhere((review) => review.responseId == order.id)
+                      .id,
+                );
+          }).toList();
+
       setState(() {
-        _completedOrders = completedOrders;
+        _completedOrders = ordersWithActiveOrNoReviews;
         _myReviews = reviews;
         _isLoading = false;
       });
@@ -262,61 +283,46 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image placeholder with padding
-          Padding(
-            padding: const EdgeInsets.all(16.0),
+          // Image placeholder at top, full width
+          ClipRRect(
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(12),
+              topRight: Radius.circular(12),
+            ),
             child: Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(12),
-              ),
+              width: double.infinity,
+              height: 150,
+              color: Colors.grey[200],
               child: Center(
-                child: Icon(Icons.image, color: Colors.grey[400], size: 30),
+                child: Icon(Icons.image, color: Colors.grey[400], size: 50),
               ),
             ),
           ),
           // Order details
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FutureBuilder<DocumentSnapshot>(
-                    future:
-                        FirebaseFirestore.instance
-                            .collection('portfolios')
-                            .doc(order.portfolioId)
-                            .get(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Text("Loading...");
-                      }
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FutureBuilder<DocumentSnapshot>(
+                  future:
+                      FirebaseFirestore.instance
+                          .collection('portfolios')
+                          .doc(order.portfolioId)
+                          .get(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Text("Loading...");
+                    }
 
-                      if (snapshot.hasError ||
-                          !snapshot.hasData ||
-                          !snapshot.data!.exists) {
-                        return Text(
-                          order.eventName,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        );
-                      }
-
-                      final data =
-                          snapshot.data!.data() as Map<String, dynamic>;
+                    if (snapshot.hasError ||
+                        !snapshot.hasData ||
+                        !snapshot.data!.exists) {
                       return Text(
-                        data['title'] ?? order.eventName,
+                        order.eventName,
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -325,70 +331,82 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                         overflow: TextOverflow.ellipsis,
                         maxLines: 1,
                       );
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDetailRow('Event Type:', order.eventType),
-                  const SizedBox(height: 8),
-                  _buildDetailRow(
-                    'Event Date:',
-                    DateFormat('MMM dd, yyyy').format(order.eventDate),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildDetailRow(
-                    'Amount:',
-                    'PKR ${NumberFormat('#,###').format(order.budget)}',
-                  ),
-                  // Rate button
-                  if (canRate)
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 8.0),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Rate',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
+                    }
+
+                    final data = snapshot.data!.data() as Map<String, dynamic>;
+                    return Text(
+                      data['title'] ?? order.eventName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                _buildDetailRow('Event Type:', order.eventType),
+                const SizedBox(height: 8),
+                _buildDetailRow(
+                  'Event Date:',
+                  DateFormat('MMM dd, yyyy').format(order.eventDate),
+                ),
+                const SizedBox(height: 8),
+                _buildDetailRow(
+                  'Amount:',
+                  'PKR ${NumberFormat('#,###').format(order.budget)}',
+                ),
+                // Rate button
+                if (canRate)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Rate',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
                             ),
-                            const SizedBox(width: 4),
-                            Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: () => _showRatingDialog(context, order),
-                                borderRadius: BorderRadius.circular(20),
-                                child: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF9D9DCC),
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.2),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Icon(
-                                    Icons.thumb_up,
-                                    color: Colors.white,
-                                    size: 14,
-                                  ),
+                          ),
+                          const SizedBox(width: 4),
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => _showRatingDialog(context, order),
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF9D9DCC),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.2),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.thumb_up,
+                                  color: Colors.white,
+                                  size: 14,
                                 ),
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
         ],
@@ -406,61 +424,46 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image placeholder with padding
-          Padding(
-            padding: const EdgeInsets.all(16.0),
+          // Image placeholder at top, full width
+          ClipRRect(
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(12),
+              topRight: Radius.circular(12),
+            ),
             child: Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(12),
-              ),
+              width: double.infinity,
+              height: 150,
+              color: Colors.grey[200],
               child: Center(
-                child: Icon(Icons.image, color: Colors.grey[400], size: 30),
+                child: Icon(Icons.image, color: Colors.grey[400], size: 50),
               ),
             ),
           ),
           // Order details
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FutureBuilder<DocumentSnapshot>(
-                    future:
-                        FirebaseFirestore.instance
-                            .collection('portfolios')
-                            .doc(order.portfolioId)
-                            .get(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Text("Loading...");
-                      }
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FutureBuilder<DocumentSnapshot>(
+                  future:
+                      FirebaseFirestore.instance
+                          .collection('portfolios')
+                          .doc(order.portfolioId)
+                          .get(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Text("Loading...");
+                    }
 
-                      if (snapshot.hasError ||
-                          !snapshot.hasData ||
-                          !snapshot.data!.exists) {
-                        return Text(
-                          order.eventName,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        );
-                      }
-
-                      final data =
-                          snapshot.data!.data() as Map<String, dynamic>;
+                    if (snapshot.hasError ||
+                        !snapshot.hasData ||
+                        !snapshot.data!.exists) {
                       return Text(
-                        data['title'] ?? order.eventName,
+                        order.eventName,
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -469,75 +472,87 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                         overflow: TextOverflow.ellipsis,
                         maxLines: 1,
                       );
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDetailRow('Event Type:', order.eventType),
-                  const SizedBox(height: 8),
-                  _buildDetailRow(
-                    'Event Date:',
-                    DateFormat('MMM dd, yyyy').format(order.eventDate),
-                  ),
-                  const SizedBox(height: 8),
-                  // Rating information with simplified styling (no container)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                    }
+
+                    final data = snapshot.data!.data() as Map<String, dynamic>;
+                    return Text(
+                      data['title'] ?? order.eventName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                _buildDetailRow('Event Type:', order.eventType),
+                const SizedBox(height: 8),
+                _buildDetailRow(
+                  'Event Date:',
+                  DateFormat('MMM dd, yyyy').format(order.eventDate),
+                ),
+                const SizedBox(height: 8),
+                // Rating information with simplified styling (no container)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'Your Rating: ',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        ...List.generate(5, (index) {
+                          return Icon(
+                            index < review.rating
+                                ? Icons.star
+                                : Icons.star_border,
+                            color: Colors.amber,
+                            size: 16,
+                          );
+                        }),
+                      ],
+                    ),
+                    if (review.comment.isNotEmpty) ...[
+                      const SizedBox(height: 12),
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Your Rating: ',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
+                          Container(
+                            width: 3,
+                            height: 16,
+                            margin: const EdgeInsets.only(top: 2),
+                            decoration: BoxDecoration(
                               color: Colors.black87,
+                              borderRadius: BorderRadius.circular(1.5),
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          ...List.generate(5, (index) {
-                            return Icon(
-                              index < review.rating
-                                  ? Icons.star
-                                  : Icons.star_border,
-                              color: Colors.amber,
-                              size: 16,
-                            );
-                          }),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              review.comment,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.black54,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 2,
+                            ),
+                          ),
                         ],
                       ),
-                      if (review.comment.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 3,
-                              height: 16,
-                              margin: const EdgeInsets.only(top: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.black87,
-                                borderRadius: BorderRadius.circular(1.5),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                review.comment,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.black54,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 2,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
                     ],
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],

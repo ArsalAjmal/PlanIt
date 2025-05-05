@@ -199,46 +199,36 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen>
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Stack(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Status chip positioned at top right
-              Positioned(
-                top: 8,
-                right: 8,
-                child: _buildStatusChip(order.status),
-              ),
-              // Main content row
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Image placeholder with padding - will be replaced with Firebase image later
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Icon(
-                          Icons.image,
-                          color: Colors.grey[400],
-                          size: 30,
-                        ),
-                      ),
-                    ),
+              // Stack for image placeholder and status chip
+              ClipRRect(
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
+                ),
+                child: Container(
+                  width: double.infinity,
+                  height: 150,
+                  color: Colors.grey[200],
+                  child: Center(
+                    child: Icon(Icons.image, color: Colors.grey[400], size: 50),
                   ),
-                  // Order details
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Event name (without status chip)
-                          Text(
+                ),
+              ),
+              // Order details
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Event name with status chip
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
                             order.eventName,
                             style: const TextStyle(
                               fontSize: 18,
@@ -248,119 +238,117 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen>
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
                           ),
-                          const SizedBox(height: 12),
-                          _buildDetailRow('Event Type:', order.eventType),
-                          const SizedBox(height: 8),
-                          _buildDetailRow(
-                            'Event Date:',
-                            DateFormat('MMM dd, yyyy').format(order.eventDate),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildStatusChip(order.status),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDetailRow('Event Type:', order.eventType),
+                    const SizedBox(height: 8),
+                    _buildDetailRow(
+                      'Event Date:',
+                      DateFormat('MMM dd, yyyy').format(order.eventDate),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildDetailRow(
+                      'Amount:',
+                      'PKR ${NumberFormat('#,###').format(order.budget)}',
+                    ),
+                    const SizedBox(height: 8),
+                    // Chat icon button - only show for non-completed orders
+                    if (order.status.toLowerCase() != 'completed')
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                // This will be implemented with Firebase chat later
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Chat will be implemented soon',
+                                    ),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF9D9DCC),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.2),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.chat,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
+                            ),
                           ),
-                          const SizedBox(height: 8),
-                          _buildDetailRow(
-                            'Amount:',
-                            'PKR ${NumberFormat('#,###').format(order.budget)}',
-                          ),
-                          const SizedBox(height: 8),
-                          // Chat icon button - only show for non-completed orders
-                          if (order.status.toLowerCase() != 'completed')
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    onTap: () {
-                                      // This will be implemented with Firebase chat later
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Chat will be implemented soon',
-                                          ),
-                                          duration: Duration(seconds: 2),
+                        ],
+                      ),
+                    // Review button - only show for completed orders
+                    if (order.status.toLowerCase() == 'completed')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => const FeedbackScreen(
+                                          isInBottomNavBar: false,
                                         ),
-                                      );
-                                    },
-                                    borderRadius: BorderRadius.circular(20),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF9D9DCC),
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(
-                                              0.2,
-                                            ),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: const Icon(
-                                        Icons.chat,
-                                        color: Colors.white,
-                                        size: 16,
-                                      ),
+                                  ),
+                                );
+                              },
+                              child: Row(
+                                children: [
+                                  Text(
+                                    'Tap to ',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          // Review button - only show for completed orders
-                          if (order.status.toLowerCase() == 'completed')
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8.0),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  GestureDetector(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder:
-                                              (context) => const FeedbackScreen(
-                                                isInBottomNavBar: false,
-                                              ),
-                                        ),
-                                      );
-                                    },
-                                    child: Row(
-                                      children: [
-                                        Text(
-                                          'Tap to ',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                        Text(
-                                          'rate',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.black,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Icon(
-                                          Icons.thumb_up,
-                                          size: 14,
-                                          color: Colors.amber,
-                                        ),
-                                      ],
+                                  Text(
+                                    'rate',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black,
                                     ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.thumb_up,
+                                    size: 14,
+                                    color: Colors.amber,
                                   ),
                                 ],
                               ),
                             ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),

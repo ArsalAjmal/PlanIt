@@ -8,12 +8,14 @@ class Todo {
   String id;
   String title;
   bool completed;
+  String status; // Add status field: 'todo', 'inProgress', 'done'
   DateTime createdAt;
 
   Todo({
     required this.id,
     required this.title,
     required this.completed,
+    required this.status,
     required this.createdAt,
   });
 
@@ -22,6 +24,7 @@ class Todo {
       'id': id,
       'title': title,
       'completed': completed,
+      'status': status,
       'createdAt': createdAt,
     };
   }
@@ -31,6 +34,7 @@ class Todo {
       id: map['id'] ?? '',
       title: map['title'] ?? '',
       completed: map['completed'] ?? false,
+      status: map['status'] ?? 'todo',
       createdAt:
           (map['createdAt'] is Timestamp)
               ? (map['createdAt'] as Timestamp).toDate()
@@ -48,6 +52,7 @@ class OrganizerTodoScreen extends StatefulWidget {
 
 class _OrganizerTodoScreenState extends State<OrganizerTodoScreen> {
   List<Todo> todos = [];
+  String _selectedStatus = 'todo'; // Default selected status
   final TextEditingController _controller = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -89,7 +94,14 @@ class _OrganizerTodoScreenState extends State<OrganizerTodoScreen> {
               .get();
 
       final loadedTodos =
-          snapshot.docs.map((doc) => Todo.fromMap(doc.data())).toList();
+          snapshot.docs.map((doc) {
+            final data = doc.data();
+            // Ensure each todo has a status field, defaults to 'todo' if missing
+            if (!data.containsKey('status')) {
+              data['status'] = data['completed'] ? 'done' : 'todo';
+            }
+            return Todo.fromMap(data);
+          }).toList();
 
       setState(() {
         todos = loadedTodos;
@@ -132,6 +144,7 @@ class _OrganizerTodoScreenState extends State<OrganizerTodoScreen> {
         id: todoId,
         title: _controller.text,
         completed: false,
+        status: _selectedStatus, // Use the selected status
         createdAt: DateTime.now(),
       );
 
@@ -168,6 +181,7 @@ class _OrganizerTodoScreenState extends State<OrganizerTodoScreen> {
 
     final todo = todos[index];
     final updatedCompleted = !todo.completed;
+    final updatedStatus = updatedCompleted ? 'done' : todo.status;
 
     try {
       // Update in Firestore
@@ -176,17 +190,50 @@ class _OrganizerTodoScreenState extends State<OrganizerTodoScreen> {
           .doc(_userId)
           .collection('todos')
           .doc(todo.id)
-          .update({'completed': updatedCompleted});
+          .update({'completed': updatedCompleted, 'status': updatedStatus});
 
       // Update local state
       setState(() {
         todos[index].completed = updatedCompleted;
+        todos[index].status = updatedStatus;
       });
     } catch (e) {
       print('Error updating todo: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Error updating task'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _updateTodoStatus(int index, String newStatus) async {
+    if (_userId == null) return;
+
+    final todo = todos[index];
+    // If marking as done, also update completed status
+    final updatedCompleted = newStatus == 'done' ? true : todo.completed;
+
+    try {
+      // Update in Firestore
+      await _firestore
+          .collection('organizers')
+          .doc(_userId)
+          .collection('todos')
+          .doc(todo.id)
+          .update({'status': newStatus, 'completed': updatedCompleted});
+
+      // Update local state
+      setState(() {
+        todos[index].status = newStatus;
+        todos[index].completed = updatedCompleted;
+      });
+    } catch (e) {
+      print('Error updating todo status: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error updating task status'),
           backgroundColor: Colors.red,
         ),
       );
@@ -221,6 +268,12 @@ class _OrganizerTodoScreenState extends State<OrganizerTodoScreen> {
       );
     }
   }
+
+  // Get counts for each status
+  int get todoCount => todos.where((todo) => todo.status == 'todo').length;
+  int get inProgressCount =>
+      todos.where((todo) => todo.status == 'inProgress').length;
+  int get doneCount => todos.where((todo) => todo.status == 'done').length;
 
   @override
   Widget build(BuildContext context) {
@@ -285,63 +338,165 @@ class _OrganizerTodoScreenState extends State<OrganizerTodoScreen> {
                         ],
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Row(
+
+                    // My Tasks section with categories - moved to top
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                        horizontal: 16,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _controller,
-                              decoration: InputDecoration(
-                                hintText: 'Add a new task',
-                                hintStyle: TextStyle(
-                                  color: const Color(
-                                    0xFF9D9DCC,
-                                  ).withOpacity(0.6),
-                                ),
-                                filled: true,
-                                fillColor: Colors.white,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF9D9DCC),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 3,
+                                    height: 20,
+                                    decoration: BoxDecoration(
+                                      color: Colors.black87,
+                                      borderRadius: BorderRadius.circular(1.5),
+                                    ),
                                   ),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF9D9DCC),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'My Tasks',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
                                   ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF9D9DCC),
-                                    width: 2,
-                                  ),
-                                ),
+                                ],
                               ),
-                              onSubmitted: (_) => _addTodo(),
-                            ),
+                            ],
                           ),
-                          const SizedBox(width: 16),
-                          ElevatedButton(
-                            onPressed: _addTodo,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF9D9DCC),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                          const SizedBox(height: 16),
+
+                          // Task categories
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildTaskCategoryCard(
+                                  'To Do',
+                                  todoCount,
+                                  'todo',
+                                  Colors.redAccent,
+                                  Icons.circle,
+                                ),
                               ),
-                            ),
-                            child: const Text(
-                              'Add',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _buildTaskCategoryCard(
+                                  'In Progress',
+                                  inProgressCount,
+                                  'inProgress',
+                                  Colors.orangeAccent,
+                                  Icons.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _buildTaskCategoryCard(
+                                  'Done',
+                                  doneCount,
+                                  'done',
+                                  Colors.green,
+                                  Icons.circle,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
+
+                    // Input field moved below My Tasks section - only visible when Todo is selected
+                    Visibility(
+                      visible: _selectedStatus == 'todo',
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _controller,
+                                decoration: InputDecoration(
+                                  labelText: 'Task',
+                                  hintText: 'Add a new task',
+                                  hintStyle: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 16,
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.grey.withOpacity(0.1),
+                                  labelStyle: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 16,
+                                  ),
+                                  prefixIcon: const Icon(
+                                    Icons.task_alt,
+                                    color: Color(0xFF9D9DCC),
+                                    size: 20,
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 10.0,
+                                    horizontal: 12.0,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: const BorderSide(
+                                      color: Color(0xFF9D9DCC),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  isDense: true,
+                                ),
+                                style: const TextStyle(
+                                  color: Colors.black87,
+                                  fontSize: 16,
+                                ),
+                                onSubmitted: (_) => _addTodo(),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            ElevatedButton(
+                              onPressed: _addTodo,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF9D9DCC),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'Add',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
                     Expanded(
                       child:
                           todos.isEmpty
@@ -378,8 +533,9 @@ class _OrganizerTodoScreenState extends State<OrganizerTodoScreen> {
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 16,
                                 ),
-                                itemCount: todos.length,
+                                itemCount: _filteredTodos.length,
                                 itemBuilder: (context, index) {
+                                  final todo = _filteredTodos[index];
                                   return Card(
                                     elevation: 4,
                                     margin: const EdgeInsets.only(bottom: 8),
@@ -388,28 +544,90 @@ class _OrganizerTodoScreenState extends State<OrganizerTodoScreen> {
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: ListTile(
-                                      leading: Checkbox(
-                                        value: todos[index].completed,
-                                        onChanged: (_) => _toggleTodo(index),
-                                        activeColor: const Color(0xFF9D9DCC),
-                                      ),
+                                      leading:
+                                          todo.status == 'done'
+                                              ? Container(
+                                                width: 10,
+                                                height: 10,
+                                                margin: const EdgeInsets.all(8),
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.green,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              )
+                                              : todo.status == 'inProgress'
+                                              ? Container(
+                                                width: 10,
+                                                height: 10,
+                                                margin: const EdgeInsets.all(8),
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.orangeAccent,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              )
+                                              : Container(
+                                                width: 10,
+                                                height: 10,
+                                                margin: const EdgeInsets.all(8),
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.redAccent,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
                                       title: Text(
-                                        todos[index].title,
+                                        todo.title,
                                         style: TextStyle(
                                           decoration:
-                                              todos[index].completed
+                                              todo.status == 'done'
                                                   ? TextDecoration.lineThrough
                                                   : null,
-                                          color: const Color(0xFF9D9DCC),
+                                          color: Colors.black87,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                      trailing: IconButton(
-                                        icon: const Icon(
-                                          Icons.delete,
-                                          color: Color(0xFF9D9DCC),
-                                        ),
-                                        onPressed: () => _deleteTodo(index),
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          PopupMenuButton<String>(
+                                            icon: const Icon(
+                                              Icons.more_vert,
+                                              color: Colors.black87,
+                                            ),
+                                            onSelected: (String value) {
+                                              if (value == 'delete') {
+                                                _deleteTodo(
+                                                  todos.indexOf(todo),
+                                                );
+                                              } else {
+                                                _updateTodoStatus(
+                                                  todos.indexOf(todo),
+                                                  value,
+                                                );
+                                              }
+                                            },
+                                            itemBuilder:
+                                                (BuildContext context) => [
+                                                  const PopupMenuItem(
+                                                    value: 'todo',
+                                                    child: Text('To Do'),
+                                                  ),
+                                                  const PopupMenuItem(
+                                                    value: 'inProgress',
+                                                    child: Text('In Progress'),
+                                                  ),
+                                                  const PopupMenuItem(
+                                                    value: 'done',
+                                                    child: Text('Done'),
+                                                  ),
+                                                  const PopupMenuItem(
+                                                    value: 'delete',
+                                                    child: Text('Delete'),
+                                                  ),
+                                                ],
+                                            color: Colors.white,
+                                            elevation: 3,
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   );
@@ -418,6 +636,75 @@ class _OrganizerTodoScreenState extends State<OrganizerTodoScreen> {
                     ),
                   ],
                 ),
+      ),
+    );
+  }
+
+  // Get filtered todos based on selected status
+  List<Todo> get _filteredTodos =>
+      _selectedStatus == 'all'
+          ? todos
+          : todos.where((todo) => todo.status == _selectedStatus).toList();
+
+  // Build task category card
+  Widget _buildTaskCategoryCard(
+    String title,
+    int count,
+    String status,
+    Color iconColor,
+    IconData iconData,
+  ) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedStatus = status;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        decoration: BoxDecoration(
+          color:
+              _selectedStatus == status
+                  ? iconColor.withOpacity(0.1)
+                  : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color:
+                _selectedStatus == status
+                    ? iconColor
+                    : Colors.grey.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(iconData, color: iconColor, size: 14),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    title,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 3),
+            Text(
+              count > 0 ? '$count tasks' : 'No tasks',
+              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -143,40 +143,44 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
                 Expanded(
                   child: FadeTransition(
                     opacity: _fadeAnimation,
-                    child: ListView(
-                      padding: EdgeInsets.zero,
-                      children: [
-                        _buildCompactWeatherAlert(context),
-                        _buildEventCountdown(context),
-                        const SizedBox(height: 12),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 3,
-                                height: 24,
-                                decoration: BoxDecoration(
-                                  color: Colors.black87,
-                                  borderRadius: BorderRadius.circular(1.5),
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Column(
+                        children: [
+                          _buildCompactWeatherAlert(context),
+                          _buildEventCountdown(context),
+                          const SizedBox(height: 12),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20.0,
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 3,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black87,
+                                    borderRadius: BorderRadius.circular(1.5),
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Services',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                  letterSpacing: 0.5,
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Services',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        _buildMenuGrid(context),
-                      ],
+                          const SizedBox(height: 8),
+                          _buildMenuGrid(context),
+                        ],
+                      ),
                     ),
                   ),
                 ),

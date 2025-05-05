@@ -11,6 +11,7 @@ import '../controllers/pending_orders_controller.dart';
 import '../models/response_model.dart';
 import '../services/portfolio_service.dart';
 import '../constants/app_colors.dart';
+import 'organizer/my_portfolios_screen.dart';
 
 class OrganizerHomeScreen extends StatefulWidget {
   const OrganizerHomeScreen({super.key});
@@ -104,104 +105,338 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen> {
 
     return Drawer(
       child: Container(
-        color: AppColors.creamBackground,
-        child: ListView(
-          padding: EdgeInsets.zero,
+        color: Colors.white,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            DrawerHeader(
-              decoration: const BoxDecoration(color: Color(0xFF9D9DCC)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
+            UserAccountsDrawerHeader(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF9D9DCC), Color(0xFF7575A8)],
+                ),
+              ),
+              currentAccountPicture: CircleAvatar(
+                backgroundColor: Colors.white,
+                child: Text(
+                  avatarText,
+                  style: const TextStyle(
+                    color: Color(0xFF9D9DCC),
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              accountName: Text(
+                displayName,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              accountEmail: Text(
+                email,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
                 children: [
-                  const CircleAvatar(
-                    backgroundColor: Color(0xFFFFFDD0),
-                    radius: 30,
-                    child: Icon(
-                      Icons.person,
-                      size: 30,
-                      color: Color(0xFF9D9DCC),
+                  // Account section
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: 20,
+                      top: 16,
+                      bottom: 8,
+                    ),
+                    child: Text(
+                      'Account',
+                      style: TextStyle(
+                        color: Colors.black87,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Organizer Menu',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.account_circle,
+                    title: 'My Account',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Navigation will be added later
+                    },
+                  ),
+                  // Divider
+                  Padding(
+                    padding: const EdgeInsets.only(left: 20, right: 20),
+                    child: Divider(color: Colors.grey[200], height: 1),
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.create,
+                    title: 'Create Portfolio',
+                    onTap: () {
+                      Navigator.pop(context); // Close the drawer
+                      final String organizerId = _auth.currentUser?.uid ?? '';
+                      if (organizerId.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) => PortfolioCreationScreen(
+                                  organizerId: organizerId,
+                                ),
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'User not authenticated. Please log in again.',
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  // Divider
+                  Padding(
+                    padding: const EdgeInsets.only(left: 20, right: 20),
+                    child: Divider(color: Colors.grey[200], height: 1),
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.book,
+                    title: 'My Portfolio',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Navigation will be added later
+                      final String organizerId = _auth.currentUser?.uid ?? '';
+                      if (organizerId.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) => MyPortfoliosScreen(
+                                  organizerId: organizerId,
+                                ),
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'User not authenticated. Please log in again.',
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  // Divider
+                  Padding(
+                    padding: const EdgeInsets.only(left: 20, right: 20),
+                    child: Divider(color: Colors.grey[200], height: 1),
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.people,
+                    title: 'Invite friends',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Navigation will be added later
+                    },
+                  ),
+
+                  // Perks section
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: 20,
+                      top: 24,
+                      bottom: 8,
+                    ),
+                    child: Text(
+                      'Perks for you',
+                      style: TextStyle(
+                        color: Colors.black87,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.star,
+                    title: 'Become a pro',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Navigation will be added later
+                    },
+                  ),
+                  // Divider
+                  Padding(
+                    padding: const EdgeInsets.only(left: 20, right: 20),
+                    child: Divider(color: Colors.grey[200], height: 1),
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.emoji_events,
+                    title: 'PlanIt rewards',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Navigation will be added later
+                    },
+                  ),
+
+                  // General section
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: 20,
+                      top: 24,
+                      bottom: 8,
+                    ),
+                    child: Text(
+                      'General',
+                      style: TextStyle(
+                        color: Colors.black87,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.help_outline,
+                    title: 'Help center',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Navigation will be added later
+                    },
+                  ),
+                  // Divider
+                  Padding(
+                    padding: const EdgeInsets.only(left: 20, right: 20),
+                    child: Divider(color: Colors.grey[200], height: 1),
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.policy,
+                    title: 'Terms & policies',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Navigation will be added later
+                    },
+                  ),
+
+                  // Logout button
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Container(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const LoginView(),
+                            ),
+                          );
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: BorderSide(color: Colors.grey[300]!),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'Log out',
+                          style: TextStyle(
+                            color: Colors.black87,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Version info with beta tag
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0, top: 8.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Version 1.0.0',
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'BETA - Multan only',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.create, color: Color(0xFF9D9DCC)),
-              title: const Text('Create Portfolio'),
-              onTap: () {
-                Navigator.pop(context); // Close the drawer
-                final String organizerId = _auth.currentUser?.uid ?? '';
-                if (organizerId.isNotEmpty) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder:
-                          (context) =>
-                              PortfolioCreationScreen(organizerId: organizerId),
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'User not authenticated. Please log in again.',
-                      ),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.account_circle,
-                color: Color(0xFF9D9DCC),
-              ),
-              title: const Text('My Account'),
-              onTap: () {
-                Navigator.pop(context); // Close the drawer
-                // Navigation will be added later
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.help_outline, color: Color(0xFF9D9DCC)),
-              title: const Text('Help Center'),
-              onTap: () {
-                Navigator.pop(context); // Close the drawer
-                // Navigation will be added later
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.policy, color: Color(0xFF9D9DCC)),
-              title: const Text('Terms and Policies'),
-              onTap: () {
-                Navigator.pop(context); // Close the drawer
-                // Navigation will be added later
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.logout, color: Color(0xFF9D9DCC)),
-              title: const Text('Logout'),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginView()),
-                );
-              },
-            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildDrawerTile(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: const Color(0xFF9D9DCC), size: 22),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+          color: Colors.black87,
+        ),
+      ),
+      trailing: Icon(
+        Icons.arrow_forward_ios,
+        size: 14,
+        color: Colors.grey[400],
+      ),
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 20.0,
+        vertical: 2.0,
+      ),
+      dense: true,
     );
   }
 

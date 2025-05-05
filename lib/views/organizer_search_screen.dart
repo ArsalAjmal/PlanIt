@@ -10,6 +10,7 @@ import '../widgets/firestore_image.dart' as fw;
 import 'client/portfolio_response_screen.dart';
 import '../constants/app_colors.dart';
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class OrganizerSearchScreen extends StatelessWidget {
   final String clientId;
@@ -49,6 +50,11 @@ class _OrganizerSearchViewState extends State<OrganizerSearchView> {
   Timer? _promotionalTimer;
   int _remainingSeconds = 15 * 60; // 15 minutes in seconds
 
+  // Cache for ratings and event counts
+  final Map<String, double> _portfolioRatings = {};
+  final Map<String, int> _portfolioEventCounts = {};
+  final Map<String, double> _organizerRatings = {};
+
   @override
   void initState() {
     super.initState();
@@ -57,9 +63,66 @@ class _OrganizerSearchViewState extends State<OrganizerSearchView> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Access the controller here
+    final controller = Provider.of<OrganizerSearchController>(
+      context,
+      listen: false,
+    );
+    controller.addListener(_preloadRatingsAndCounts);
+  }
+
+  @override
   void dispose() {
     _promotionalTimer?.cancel();
+    final controller = Provider.of<OrganizerSearchController>(
+      context,
+      listen: false,
+    );
+    controller.removeListener(_preloadRatingsAndCounts);
     super.dispose();
+  }
+
+  // Preload ratings and event counts when search results change
+  void _preloadRatingsAndCounts() async {
+    final controller = Provider.of<OrganizerSearchController>(
+      context,
+      listen: false,
+    );
+    bool dataChanged = false;
+    List<Future> futures = [];
+
+    // Preload all portfolio ratings and event counts
+    for (var portfolio in controller.portfolios) {
+      if (!_portfolioRatings.containsKey(portfolio.id)) {
+        futures.add(
+          _getPortfolioRating(portfolio.id).then((_) => dataChanged = true),
+        );
+      }
+      if (!_portfolioEventCounts.containsKey(portfolio.id)) {
+        futures.add(
+          _getPortfolioEventCount(portfolio.id).then((_) => dataChanged = true),
+        );
+      }
+    }
+
+    // Preload all organizer ratings
+    for (var organizer in controller.organizers) {
+      if (!_organizerRatings.containsKey(organizer.id)) {
+        futures.add(
+          _getOrganizerRating(organizer.id).then((_) => dataChanged = true),
+        );
+      }
+    }
+
+    // Wait for all data to load
+    if (futures.isNotEmpty) {
+      await Future.wait(futures);
+      if (dataChanged && mounted) {
+        setState(() {}); // Refresh UI once all data is loaded
+      }
+    }
   }
 
   void _startPromoTimer() {
@@ -78,6 +141,95 @@ class _OrganizerSearchViewState extends State<OrganizerSearchView> {
     int minutes = seconds ~/ 60;
     int remainingSeconds = seconds % 60;
     return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
+  // Get portfolio rating, with caching
+  Future<double> _getPortfolioRating(String portfolioId) async {
+    if (_portfolioRatings.containsKey(portfolioId)) {
+      return _portfolioRatings[portfolioId]!;
+    }
+
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('reviews')
+              .where('portfolioId', isEqualTo: portfolioId)
+              .get();
+
+      final reviews = snapshot.docs;
+      double averageRating = 0;
+
+      if (reviews.isNotEmpty) {
+        double totalRating = 0;
+        for (var doc in reviews) {
+          final data = doc.data() as Map<String, dynamic>;
+          totalRating += (data['rating'] as num).toDouble();
+        }
+        averageRating = totalRating / reviews.length;
+      }
+
+      _portfolioRatings[portfolioId] = averageRating;
+      return averageRating;
+    } catch (e) {
+      print('Error getting portfolio rating: $e');
+      return 0.0;
+    }
+  }
+
+  // Get portfolio event count, with caching
+  Future<int> _getPortfolioEventCount(String portfolioId) async {
+    if (_portfolioEventCounts.containsKey(portfolioId)) {
+      return _portfolioEventCounts[portfolioId]!;
+    }
+
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('responses')
+              .where('portfolioId', isEqualTo: portfolioId)
+              .where('status', isEqualTo: 'completed')
+              .get();
+
+      final eventCount = snapshot.docs.length;
+      _portfolioEventCounts[portfolioId] = eventCount;
+      return eventCount;
+    } catch (e) {
+      print('Error getting portfolio event count: $e');
+      return 0;
+    }
+  }
+
+  // Get organizer rating, with caching
+  Future<double> _getOrganizerRating(String organizerId) async {
+    if (_organizerRatings.containsKey(organizerId)) {
+      return _organizerRatings[organizerId]!;
+    }
+
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('reviews')
+              .where('organizerId', isEqualTo: organizerId)
+              .get();
+
+      final reviews = snapshot.docs;
+      double averageRating = 0;
+
+      if (reviews.isNotEmpty) {
+        double totalRating = 0;
+        for (var doc in reviews) {
+          final data = doc.data() as Map<String, dynamic>;
+          totalRating += (data['rating'] as num).toDouble();
+        }
+        averageRating = totalRating / reviews.length;
+      }
+
+      _organizerRatings[organizerId] = averageRating;
+      return averageRating;
+    } catch (e) {
+      print('Error getting organizer rating: $e');
+      return 0.0;
+    }
   }
 
   @override
@@ -370,6 +522,12 @@ class _OrganizerSearchViewState extends State<OrganizerSearchView> {
       decimalDigits: 0,
     );
 
+    // No need to fetch rating here as it's now preloaded
+    // Just trigger a fetch if data isn't already in cache for some reason
+    if (!_organizerRatings.containsKey(organizer.id)) {
+      _getOrganizerRating(organizer.id);
+    }
+
     return Card(
       color: Colors.white,
       margin: const EdgeInsets.only(bottom: 12),
@@ -403,7 +561,11 @@ class _OrganizerSearchViewState extends State<OrganizerSearchView> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '${organizer.rating}/5',
+              _organizerRatings.containsKey(organizer.id)
+                  ? (_organizerRatings[organizer.id]! > 0
+                      ? '${_organizerRatings[organizer.id]!.toStringAsFixed(1)}/5'
+                      : 'N/A')
+                  : '${organizer.rating}/5',
               style: const TextStyle(
                 color: Colors.black87,
                 fontWeight: FontWeight.bold,
@@ -1019,12 +1181,22 @@ class _OrganizerSearchViewState extends State<OrganizerSearchView> {
       decimalDigits: 0,
     );
 
+    // No need to fetch ratings here as they're now preloaded
+    // Just trigger a fetch if data isn't already in cache for some reason
+    if (!_portfolioRatings.containsKey(portfolio.id)) {
+      _getPortfolioRating(portfolio.id);
+    }
+    if (!_portfolioEventCounts.containsKey(portfolio.id)) {
+      _getPortfolioEventCount(portfolio.id);
+    }
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 4,
       key: ValueKey('portfolio_${portfolio.id}'),
+      color: Colors.white,
       child: InkWell(
         onTap: () {
           Navigator.push(
@@ -1110,7 +1282,12 @@ class _OrganizerSearchViewState extends State<OrganizerSearchView> {
                       const Icon(Icons.star, color: Colors.amber, size: 16),
                       const SizedBox(width: 4),
                       Text(
-                        portfolio.rating.toStringAsFixed(1),
+                        _portfolioRatings.containsKey(portfolio.id)
+                            ? (_portfolioRatings[portfolio.id]! > 0
+                                ? _portfolioRatings[portfolio.id]!
+                                    .toStringAsFixed(1)
+                                : 'N/A')
+                            : portfolio.rating.toStringAsFixed(1),
                         style: const TextStyle(
                           color: Colors.black87,
                           fontWeight: FontWeight.bold,
@@ -1118,7 +1295,7 @@ class _OrganizerSearchViewState extends State<OrganizerSearchView> {
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        '${portfolio.totalEvents} events',
+                        '${_portfolioEventCounts.containsKey(portfolio.id) ? _portfolioEventCounts[portfolio.id] : portfolio.totalEvents} events',
                         style: TextStyle(color: Colors.grey[600], fontSize: 14),
                       ),
                     ],

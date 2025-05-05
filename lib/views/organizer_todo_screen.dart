@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../constants/app_colors.dart';
 
 class Todo {
   String id;
@@ -233,35 +234,57 @@ class _OrganizerTodoScreenState extends State<OrganizerTodoScreen> {
 
     return SafeArea(
       child: Scaffold(
-        backgroundColor: const Color(0xFFFFFDD0),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF9D9DCC),
-          elevation: 0,
-          title: const Text(
-            'Todo List',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 20,
-            ),
-          ),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.white),
-              onPressed: _loadTodos,
-              tooltip: 'Refresh',
-            ),
-          ],
-        ),
+        backgroundColor: AppColors.creamBackground,
+        appBar: null,
         body:
             _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : Column(
                   children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF9D9DCC),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black12,
+                            offset: Offset(0, 2),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.white,
+                            ),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                          const Text(
+                            'Todo List',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.refresh,
+                              color: Colors.white,
+                            ),
+                            onPressed: _loadTodos,
+                            tooltip: 'Refresh',
+                          ),
+                        ],
+                      ),
+                    ),
                     Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: Row(
@@ -360,6 +383,7 @@ class _OrganizerTodoScreenState extends State<OrganizerTodoScreen> {
                                   return Card(
                                     elevation: 4,
                                     margin: const EdgeInsets.only(bottom: 8),
+                                    color: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),

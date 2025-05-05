@@ -142,6 +142,22 @@ class PortfolioService {
         });
   }
 
+  // Get responses for an organizer as a Future<List> instead of a Stream
+  Future<List<ResponseModel>> getResponsesForOrganizerAsList(
+    String organizerId,
+  ) async {
+    final snapshot =
+        await _firestore
+            .collection(_responseCollection)
+            .where('organizerId', isEqualTo: organizerId)
+            .orderBy('createdAt', descending: true)
+            .get();
+
+    return snapshot.docs
+        .map((doc) => ResponseModel.fromMap(doc.data() as Map<String, dynamic>))
+        .toList();
+  }
+
   // Update response status
   Future<void> updateResponseStatus(String responseId, String status) async {
     await _firestore.collection(_responseCollection).doc(responseId).update({

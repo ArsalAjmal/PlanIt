@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import '../../models/portfolio_model.dart';
 import '../../services/portfolio_service.dart';
 import '../../widgets/firestore_image.dart';
+import '../../constants/app_colors.dart';
 
 class PortfolioCreationScreen extends StatefulWidget {
   final String organizerId;
@@ -208,345 +209,751 @@ class _PortfolioCreationScreenState extends State<PortfolioCreationScreen> {
 
     return SafeArea(
       child: Scaffold(
-        backgroundColor: const Color(0xFFFFFDD0),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF9D9DCC),
-          elevation: 0,
-          title: const Text(
-            'Create Portfolio',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 20,
-            ),
-          ),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
+        backgroundColor: AppColors.creamBackground,
+        appBar: null,
         body:
             _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        TextFormField(
-                          controller: _titleController,
-                          decoration: InputDecoration(
-                            labelText: 'Title',
-                            filled: true,
-                            fillColor: Colors.white,
-                            labelStyle: const TextStyle(
-                              color: Color(0xFF9D9DCC),
+                : Column(
+                  children: [
+                    // Custom app bar that matches My Portfolios screen
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF9D9DCC),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black12,
+                            offset: Offset(0, 2),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.white,
                             ),
-                            prefixIcon: const Icon(
-                              Icons.title,
-                              color: Color(0xFF9D9DCC),
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            hintText:
-                                'Enter a descriptive title (e.g., "Arsal Decor")',
-                            hintStyle: TextStyle(
-                              color: const Color(0xFF9D9DCC).withOpacity(0.6),
-                              fontSize: 16,
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                          const Text(
+                            'Create Portfolio',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          style: const TextStyle(
-                            color: Color(0xFF6B6B8D),
-                            fontSize: 16,
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter a title';
-                            }
-                            if (value.length < 3) {
-                              return 'Title must be at least 3 characters';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _descriptionController,
-                          decoration: InputDecoration(
-                            labelText: 'Description',
-                            filled: true,
-                            fillColor: Colors.white,
-                            floatingLabelBehavior: FloatingLabelBehavior.auto,
-                            alignLabelWithHint: true,
-                            labelStyle: const TextStyle(
-                              color: Color(0xFF9D9DCC),
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            hintText: 'Describe your services and expertise',
-                            hintStyle: TextStyle(
-                              color: const Color(0xFF9D9DCC).withOpacity(0.6),
-                              fontSize: 16,
-                            ),
-                            contentPadding: EdgeInsets.fromLTRB(12, 20, 12, 12),
-                          ),
-                          style: const TextStyle(
-                            color: Color(0xFF6B6B8D),
-                            fontSize: 16,
-                          ),
-                          maxLines: 3,
-                          textAlignVertical: TextAlignVertical.top,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter a description';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
+                          const Spacer(),
+                        ],
+                      ),
+                    ),
+
+                    // Content scrollable area
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: _minBudgetController,
-                                decoration: InputDecoration(
-                                  labelText: 'Min Budget',
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  labelStyle: const TextStyle(
-                                    color: Color(0xFF9D9DCC),
-                                  ),
-                                  prefixIcon: const Icon(
-                                    Icons.currency_rupee,
-                                    color: Color(0xFF9D9DCC),
-                                  ),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
+                            // Promotional Banner for PlanIt Pro
+                            Container(
+                              width: double.infinity,
+                              margin: const EdgeInsets.only(bottom: 16),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFF6A1B9A),
+                                    Color(0xFF9D9DCC),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
                                 ),
-                                style: const TextStyle(
-                                  color: Color(0xFF6B6B8D),
-                                  fontSize: 16,
-                                ),
-                                keyboardType: TextInputType.number,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Please enter min budget';
-                                  }
-                                  if (double.tryParse(value) == null) {
-                                    return 'Please enter a valid number';
-                                  }
-                                  return null;
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: TextFormField(
-                                controller: _maxBudgetController,
-                                decoration: InputDecoration(
-                                  labelText: 'Max Budget',
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  labelStyle: const TextStyle(
-                                    color: Color(0xFF9D9DCC),
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
                                   ),
-                                  prefixIcon: const Icon(
-                                    Icons.currency_rupee,
-                                    color: Color(0xFF9D9DCC),
-                                  ),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                style: const TextStyle(
-                                  color: Color(0xFF6B6B8D),
-                                  fontSize: 16,
-                                ),
-                                keyboardType: TextInputType.number,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Please enter max budget';
-                                  }
-                                  if (double.tryParse(value) == null) {
-                                    return 'Please enter a valid number';
-                                  }
-                                  final minBudget =
-                                      double.tryParse(
-                                        _minBudgetController.text,
-                                      ) ??
-                                      0;
-                                  final maxBudget = double.tryParse(value) ?? 0;
-                                  if (maxBudget < minBudget) {
-                                    return 'Max budget must be >= min budget';
-                                  }
-                                  return null;
-                                },
+                                ],
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Event Types',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF6B6B8D),
-                          ),
-                        ),
-                        Wrap(
-                          spacing: 8,
-                          children:
-                              _availableEventTypes.map((type) {
-                                return FilterChip(
-                                  label: Text(type),
-                                  selected: _selectedEventTypes.contains(type),
-                                  selectedColor: const Color(
-                                    0xFF9D9DCC,
-                                  ).withOpacity(0.7),
-                                  backgroundColor: Colors.white,
-                                  checkmarkColor: Colors.white,
-                                  side: BorderSide(
-                                    color: const Color(0xFF9D9DCC),
-                                  ),
-                                  onSelected: (selected) {
-                                    setState(() {
-                                      if (selected) {
-                                        _selectedEventTypes.add(type);
-                                      } else {
-                                        _selectedEventTypes.remove(type);
-                                      }
-                                    });
-                                  },
-                                );
-                              }).toList(),
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Portfolio Images',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF6B6B8D),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        _imageUrls.isEmpty
-                            ? ElevatedButton.icon(
-                              onPressed: _pickImages,
-                              icon: const Icon(
-                                Icons.add_photo_alternate,
-                                color: Colors.white,
-                              ),
-                              label: const Text(
-                                'Add Images',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF9D9DCC),
-                              ),
-                            )
-                            : Column(
-                              children: [
-                                Container(
-                                  height: 200,
-                                  child: GridView.builder(
-                                    shrinkWrap: true,
-                                    physics:
-                                        const NeverScrollableScrollPhysics(),
-                                    gridDelegate:
-                                        const SliverGridDelegateWithFixedCrossAxisCount(
-                                          crossAxisCount: 3,
-                                          crossAxisSpacing: 8,
-                                          mainAxisSpacing: 8,
-                                        ),
-                                    itemCount: _imageUrls.length,
-                                    itemBuilder: (context, index) {
-                                      return Stack(
-                                        fit: StackFit.expand,
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Row(
+                                  children: [
+                                    // Left side with text and button
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          ClipRRect(
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                            child: FirestoreImage(
-                                              imageUrl: _imageUrls[index],
+                                          const Text(
+                                            "Upgrade to PlanIt Pro",
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
                                             ),
                                           ),
-                                          Positioned(
-                                            right: 0,
-                                            top: 0,
-                                            child: Container(
-                                              decoration: BoxDecoration(
-                                                color: Colors.black.withOpacity(
-                                                  0.5,
+                                          const SizedBox(height: 6),
+                                          const Text(
+                                            "Get 3x more visibility & client bookings",
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          ElevatedButton(
+                                            onPressed: () {
+                                              // Implement subscription process here
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    "Pro subscription coming soon!",
+                                                  ),
+                                                  backgroundColor: Color(
+                                                    0xFF6A1B9A,
+                                                  ),
                                                 ),
-                                                shape: BoxShape.circle,
+                                              );
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.white,
+                                              foregroundColor: const Color(
+                                                0xFF6A1B9A,
                                               ),
-                                              child: IconButton(
-                                                icon: const Icon(
-                                                  Icons.delete,
-                                                  color: Colors.white,
-                                                  size: 20,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 16,
+                                                    vertical: 8,
+                                                  ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                              ),
+                                            ),
+                                            child: const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  "Upgrade Now",
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                                 ),
-                                                onPressed: () {
-                                                  setState(() {
-                                                    _imageUrls.removeAt(index);
-                                                  });
-                                                },
+                                                SizedBox(width: 4),
+                                                Icon(
+                                                  Icons.arrow_forward,
+                                                  size: 16,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Right side with badges
+                                    Container(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Icon(
+                                        Icons.trending_up,
+                                        color: Colors.white,
+                                        size: 48,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            Form(
+                              key: _formKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Portfolio Details Section
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: 12,
+                                      top: 8,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 3,
+                                          height: 20,
+                                          decoration: BoxDecoration(
+                                            color: Colors.black87,
+                                            borderRadius: BorderRadius.circular(
+                                              1.5,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text(
+                                          "Portfolio Details",
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  TextFormField(
+                                    controller: _titleController,
+                                    decoration: InputDecoration(
+                                      labelText: 'Title',
+                                      hintText:
+                                          'Enter a descriptive title (e.g., "Arsal Decor")',
+                                      hintStyle: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 16,
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.grey.withOpacity(0.1),
+                                      labelStyle: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 16,
+                                      ),
+                                      prefixIcon: const Icon(
+                                        Icons.title,
+                                        color: Color(0xFF9D9DCC),
+                                        size: 20,
+                                      ),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            vertical: 10.0,
+                                            horizontal: 12.0,
+                                          ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFF9D9DCC),
+                                          width: 1,
+                                        ),
+                                      ),
+                                      isDense: true,
+                                    ),
+                                    style: const TextStyle(
+                                      color: Colors.black87,
+                                      fontSize: 16,
+                                    ),
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Please enter a title';
+                                      }
+                                      if (value.length < 3) {
+                                        return 'Title must be at least 3 characters';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 16),
+                                  TextFormField(
+                                    controller: _descriptionController,
+                                    decoration: InputDecoration(
+                                      labelText: 'Description',
+                                      hintText:
+                                          'Describe your services and expertise',
+                                      hintStyle: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 16,
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.grey.withOpacity(0.1),
+                                      alignLabelWithHint: true,
+                                      labelStyle: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 16,
+                                      ),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            vertical: 10.0,
+                                            horizontal: 12.0,
+                                          ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFF9D9DCC),
+                                          width: 1,
+                                        ),
+                                      ),
+                                      isDense: true,
+                                    ),
+                                    style: const TextStyle(
+                                      color: Colors.black87,
+                                      fontSize: 16,
+                                    ),
+                                    maxLines: 3,
+                                    textAlignVertical: TextAlignVertical.top,
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Please enter a description';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  // Budget Section
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: 12,
+                                      top: 8,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 3,
+                                          height: 20,
+                                          decoration: BoxDecoration(
+                                            color: Colors.black87,
+                                            borderRadius: BorderRadius.circular(
+                                              1.5,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text(
+                                          "Budget Range",
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: _minBudgetController,
+                                          decoration: InputDecoration(
+                                            labelText: 'Min Budget',
+                                            hintText: 'Minimum amount',
+                                            hintStyle: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 16,
+                                            ),
+                                            filled: true,
+                                            fillColor: Colors.grey.withOpacity(
+                                              0.1,
+                                            ),
+                                            labelStyle: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 16,
+                                            ),
+                                            prefixIcon: const Icon(
+                                              Icons.currency_rupee,
+                                              color: Color(0xFF9D9DCC),
+                                              size: 20,
+                                            ),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  vertical: 10.0,
+                                                  horizontal: 12.0,
+                                                ),
+                                            border: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              borderSide: BorderSide.none,
+                                            ),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              borderSide: BorderSide.none,
+                                            ),
+                                            focusedBorder: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              borderSide: const BorderSide(
+                                                color: Color(0xFF9D9DCC),
+                                                width: 1,
+                                              ),
+                                            ),
+                                            isDense: true,
+                                          ),
+                                          style: const TextStyle(
+                                            color: Colors.black87,
+                                            fontSize: 16,
+                                          ),
+                                          keyboardType: TextInputType.number,
+                                          validator: (value) {
+                                            if (value == null ||
+                                                value.isEmpty) {
+                                              return 'Please enter min budget';
+                                            }
+                                            if (double.tryParse(value) ==
+                                                null) {
+                                              return 'Please enter a valid number';
+                                            }
+                                            return null;
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: _maxBudgetController,
+                                          decoration: InputDecoration(
+                                            labelText: 'Max Budget',
+                                            hintText: 'Maximum amount',
+                                            hintStyle: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 16,
+                                            ),
+                                            filled: true,
+                                            fillColor: Colors.grey.withOpacity(
+                                              0.1,
+                                            ),
+                                            labelStyle: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 16,
+                                            ),
+                                            prefixIcon: const Icon(
+                                              Icons.currency_rupee,
+                                              color: Color(0xFF9D9DCC),
+                                              size: 20,
+                                            ),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  vertical: 10.0,
+                                                  horizontal: 12.0,
+                                                ),
+                                            border: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              borderSide: BorderSide.none,
+                                            ),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              borderSide: BorderSide.none,
+                                            ),
+                                            focusedBorder: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              borderSide: const BorderSide(
+                                                color: Color(0xFF9D9DCC),
+                                                width: 1,
+                                              ),
+                                            ),
+                                            isDense: true,
+                                          ),
+                                          style: const TextStyle(
+                                            color: Colors.black87,
+                                            fontSize: 16,
+                                          ),
+                                          keyboardType: TextInputType.number,
+                                          validator: (value) {
+                                            if (value == null ||
+                                                value.isEmpty) {
+                                              return 'Please enter max budget';
+                                            }
+                                            if (double.tryParse(value) ==
+                                                null) {
+                                              return 'Please enter a valid number';
+                                            }
+                                            final minBudget =
+                                                double.tryParse(
+                                                  _minBudgetController.text,
+                                                ) ??
+                                                0;
+                                            final maxBudget =
+                                                double.tryParse(value) ?? 0;
+                                            if (maxBudget < minBudget) {
+                                              return 'Max budget must be >= min budget';
+                                            }
+                                            return null;
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  // Event Types Section
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: 12,
+                                      top: 8,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 3,
+                                          height: 20,
+                                          decoration: BoxDecoration(
+                                            color: Colors.black87,
+                                            borderRadius: BorderRadius.circular(
+                                              1.5,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text(
+                                          "Event Types",
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  Wrap(
+                                    spacing: 8,
+                                    children:
+                                        _availableEventTypes.map((type) {
+                                          return FilterChip(
+                                            label: Text(type),
+                                            selected: _selectedEventTypes
+                                                .contains(type),
+                                            selectedColor: AppColors
+                                                .primaryPurple
+                                                .withOpacity(0.7),
+                                            backgroundColor: Colors.white,
+                                            checkmarkColor: Colors.white,
+                                            side: BorderSide(
+                                              color: AppColors.primaryPurple,
+                                            ),
+                                            onSelected: (selected) {
+                                              setState(() {
+                                                if (selected) {
+                                                  _selectedEventTypes.add(type);
+                                                } else {
+                                                  _selectedEventTypes.remove(
+                                                    type,
+                                                  );
+                                                }
+                                              });
+                                            },
+                                          );
+                                        }).toList(),
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  // Images Section
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: 12,
+                                      top: 8,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 3,
+                                          height: 20,
+                                          decoration: BoxDecoration(
+                                            color: Colors.black87,
+                                            borderRadius: BorderRadius.circular(
+                                              1.5,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text(
+                                          "Portfolio Image",
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  _imageUrls.isEmpty
+                                      ? ElevatedButton.icon(
+                                        onPressed: _pickImages,
+                                        icon: const Icon(
+                                          Icons.add_photo_alternate,
+                                          color: Colors.white,
+                                        ),
+                                        label: const Text(
+                                          'Add Image',
+                                          style: TextStyle(color: Colors.white),
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              AppColors.primaryPurple,
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 12,
+                                            horizontal: 16,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                      : Column(
+                                        children: [
+                                          Container(
+                                            height: 200,
+                                            child: GridView.builder(
+                                              shrinkWrap: true,
+                                              physics:
+                                                  const NeverScrollableScrollPhysics(),
+                                              gridDelegate:
+                                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                                    crossAxisCount: 3,
+                                                    crossAxisSpacing: 8,
+                                                    mainAxisSpacing: 8,
+                                                  ),
+                                              itemCount: _imageUrls.length,
+                                              itemBuilder: (context, index) {
+                                                return Stack(
+                                                  fit: StackFit.expand,
+                                                  children: [
+                                                    ClipRRect(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
+                                                      child: FirestoreImage(
+                                                        imageUrl:
+                                                            _imageUrls[index],
+                                                      ),
+                                                    ),
+                                                    Positioned(
+                                                      right: 0,
+                                                      top: 0,
+                                                      child: Container(
+                                                        decoration:
+                                                            BoxDecoration(
+                                                              color: Colors
+                                                                  .black
+                                                                  .withOpacity(
+                                                                    0.5,
+                                                                  ),
+                                                              shape:
+                                                                  BoxShape
+                                                                      .circle,
+                                                            ),
+                                                        child: IconButton(
+                                                          icon: const Icon(
+                                                            Icons.delete,
+                                                            color: Colors.white,
+                                                            size: 20,
+                                                          ),
+                                                          onPressed: () {
+                                                            setState(() {
+                                                              _imageUrls
+                                                                  .removeAt(
+                                                                    index,
+                                                                  );
+                                                            });
+                                                          },
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          ElevatedButton.icon(
+                                            onPressed: _pickImages,
+                                            icon: const Icon(
+                                              Icons.add_photo_alternate,
+                                              color: Colors.white,
+                                            ),
+                                            label: const Text(
+                                              'Add More Image',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  AppColors.primaryPurple,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 12,
+                                                    horizontal: 16,
+                                                  ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
                                               ),
                                             ),
                                           ),
                                         ],
-                                      );
-                                    },
+                                      ),
+                                  const SizedBox(height: 24),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      onPressed: _submitPortfolio,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            AppColors.primaryPurple,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 16,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'Create Portfolio',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                                ElevatedButton.icon(
-                                  onPressed: _pickImages,
-                                  icon: const Icon(
-                                    Icons.add_photo_alternate,
-                                    color: Colors.white,
-                                  ),
-                                  label: const Text(
-                                    'Add More Images',
-                                    style: TextStyle(color: Colors.white),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF9D9DCC),
-                                  ),
-                                ),
-                              ],
-                            ),
-                        const SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: _submitPortfolio,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF9D9DCC),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                            ),
-                            child: const Text(
-                              'Create Portfolio',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
+                                ],
                               ),
                             ),
-                          ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
       ),
     );

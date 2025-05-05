@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../payment/order_summary_screen.dart';
 import '../../constants/app_colors.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PortfolioResponseScreen extends StatefulWidget {
   final PortfolioModel portfolio;
@@ -41,10 +42,64 @@ class _PortfolioResponseScreenState extends State<PortfolioResponseScreen> {
   bool _isLoading = false;
   final double _photographerFee = 25000.0; // PKR 25,000 for photographer
 
+  // For rating and event count caching
+  double _portfolioRating = 0.0;
+  int _eventCount = 0;
+  bool _loadingRating = true;
+
   @override
   void initState() {
     super.initState();
     _clientNameController.text = widget.clientName; // Pre-fill with user's name
+    _portfolioRating = widget.portfolio.rating;
+    _eventCount = widget.portfolio.totalEvents;
+    _loadPortfolioRating();
+  }
+
+  Future<void> _loadPortfolioRating() async {
+    setState(() {
+      _loadingRating = true;
+    });
+
+    try {
+      // Get portfolio rating
+      final ratingSnapshot =
+          await FirebaseFirestore.instance
+              .collection('reviews')
+              .where('portfolioId', isEqualTo: widget.portfolio.id)
+              .get();
+
+      double totalRating = 0;
+      if (ratingSnapshot.docs.isNotEmpty) {
+        for (var doc in ratingSnapshot.docs) {
+          totalRating += (doc.data()['rating'] as num).toDouble();
+        }
+        _portfolioRating = totalRating / ratingSnapshot.docs.length;
+      }
+
+      // Get event count
+      final eventSnapshot =
+          await FirebaseFirestore.instance
+              .collection('responses')
+              .where('portfolioId', isEqualTo: widget.portfolio.id)
+              .where('status', isEqualTo: 'completed')
+              .get();
+
+      _eventCount = eventSnapshot.docs.length;
+
+      if (mounted) {
+        setState(() {
+          _loadingRating = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading portfolio rating: $e');
+      if (mounted) {
+        setState(() {
+          _loadingRating = false;
+        });
+      }
+    }
   }
 
   @override
@@ -198,6 +253,10 @@ class _PortfolioResponseScreenState extends State<PortfolioResponseScreen> {
                     ),
                   ),
                   const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.refresh, color: Colors.white),
+                    onPressed: _loadPortfolioRating,
+                  ),
                 ],
               ),
             ),
@@ -294,28 +353,49 @@ class _PortfolioResponseScreenState extends State<PortfolioResponseScreen> {
                                 // Rating display
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    ...List.generate(5, (index) {
-                                      return Icon(
-                                        index < widget.portfolio.rating.floor()
-                                            ? Icons.star
-                                            : index < widget.portfolio.rating
-                                            ? Icons.star_half
-                                            : Icons.star_border,
-                                        color: Colors.amber,
-                                        size: 18,
-                                      );
-                                    }),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      "${widget.portfolio.rating.toStringAsFixed(1)} (${widget.portfolio.totalEvents}+ ratings)",
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                        color: Colors.black54,
-                                      ),
-                                    ),
-                                  ],
+                                  children:
+                                      _loadingRating
+                                          ? [
+                                            SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.amber,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              "Loading...",
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.black54,
+                                              ),
+                                            ),
+                                          ]
+                                          : [
+                                            ...List.generate(5, (index) {
+                                              return Icon(
+                                                index < _portfolioRating.floor()
+                                                    ? Icons.star
+                                                    : index < _portfolioRating
+                                                    ? Icons.star_half
+                                                    : Icons.star_border,
+                                                color: Colors.amber,
+                                                size: 18,
+                                              );
+                                            }),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              "${_portfolioRating.toStringAsFixed(1)} (${_eventCount}${_eventCount > 0 ? '+' : ''} ratings)",
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.black54,
+                                              ),
+                                            ),
+                                          ],
                                 ),
 
                                 const SizedBox(height: 16),

@@ -6,6 +6,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/response_model.dart';
 import '../constants/app_colors.dart';
 import 'feedback_screen.dart';
+import '../widgets/firestore_image.dart' as fw;
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class OrderHistoryScreen extends StatefulWidget {
   const OrderHistoryScreen({super.key});
@@ -204,7 +206,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen>
             children: [
               // Stack for image placeholder and status chip
               ClipRRect(
-                borderRadius: BorderRadius.only(
+                borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(12),
                   topRight: Radius.circular(12),
                 ),
@@ -212,8 +214,45 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen>
                   width: double.infinity,
                   height: 150,
                   color: Colors.grey[200],
-                  child: Center(
-                    child: Icon(Icons.image, color: Colors.grey[400], size: 50),
+                  child: FutureBuilder<DocumentSnapshot>(
+                    future:
+                        FirebaseFirestore.instance
+                            .collection('portfolios')
+                            .doc(order.portfolioId)
+                            .get(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData ||
+                          snapshot.hasError ||
+                          !snapshot.data!.exists) {
+                        return Center(
+                          child: Icon(
+                            Icons.image,
+                            color: Colors.grey[400],
+                            size: 50,
+                          ),
+                        );
+                      }
+
+                      final data =
+                          snapshot.data!.data() as Map<String, dynamic>;
+                      final List<dynamic> images = data['imageUrls'] ?? [];
+
+                      if (images.isEmpty) {
+                        return Center(
+                          child: Icon(
+                            Icons.image,
+                            color: Colors.grey[400],
+                            size: 50,
+                          ),
+                        );
+                      }
+
+                      // Display the first image from portfolio
+                      return fw.FirestoreImage(
+                        imageUrl: images[0].toString(),
+                        fit: BoxFit.cover,
+                      );
+                    },
                   ),
                 ),
               ),

@@ -186,6 +186,10 @@ class OrderSummaryScreen extends StatefulWidget {
   final String additionalNotes;
   final String clientId;
   final String clientName;
+  final String address;
+  final String apartment;
+  final String city;
+  final String phoneNumber;
 
   const OrderSummaryScreen({
     Key? key,
@@ -203,6 +207,10 @@ class OrderSummaryScreen extends StatefulWidget {
     required this.additionalNotes,
     required this.clientId,
     required this.clientName,
+    required this.address,
+    required this.apartment,
+    required this.city,
+    required this.phoneNumber,
   }) : super(key: key);
 
   @override
@@ -325,6 +333,10 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
           additionalNotes: widget.additionalNotes,
           status: 'pending',
           createdAt: DateTime.now(),
+          address: widget.address,
+          apartment: widget.apartment,
+          city: widget.city,
+          phoneNumber: widget.phoneNumber,
         );
 
         // Try to create response in Firestore
@@ -740,14 +752,14 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                                         MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
-                                        'Platform Fee',
+                                        'Platform Fee (5%)',
                                         style: TextStyle(
                                           fontSize: 14,
                                           color: Colors.grey[700],
                                         ),
                                       ),
-                                      const Text(
-                                        'PKR 1000',
+                                      Text(
+                                        'PKR ${(widget.budget + (widget.needsPhotographer ? widget.photographerFee : 0)) * 0.05}',
                                         style: TextStyle(
                                           fontSize: 14,
                                           color: Colors.grey,
@@ -917,7 +929,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                                         ),
                                         const Spacer(),
                                         Text(
-                                          'Rs. ${(widget.totalAmount + 1000).toStringAsFixed(2)}',
+                                          'Rs. ${(widget.totalAmount + (widget.budget + (widget.needsPhotographer ? widget.photographerFee : 0)) * 0.05).toStringAsFixed(0)}',
                                           style: const TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.bold,
@@ -1288,7 +1300,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                                 ],
                               ),
                               Text(
-                                'PKR ${(widget.totalAmount + 1000).toStringAsFixed(0)}',
+                                'PKR ${(widget.totalAmount + (widget.budget + (widget.needsPhotographer ? widget.photographerFee : 0)) * 0.05).toStringAsFixed(0)}',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -1363,7 +1375,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                         style: TextStyle(color: Colors.black87, fontSize: 14),
                       ),
                       Text(
-                        'PKR ${(widget.totalAmount + 1000).toStringAsFixed(0)}',
+                        'PKR ${(widget.totalAmount + (widget.budget + (widget.needsPhotographer ? widget.photographerFee : 0)) * 0.05).toStringAsFixed(0)}',
                         style: const TextStyle(
                           color: Colors.black87,
                           fontWeight: FontWeight.bold,

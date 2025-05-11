@@ -6,6 +6,7 @@ import 'dart:ui';
 import './weather_screen.dart';
 import './feedback_screen.dart';
 import './order_history_screen.dart';
+import './account_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import './login_view.dart';
 import './organizer_search_screen.dart';
@@ -15,6 +16,11 @@ import '../models/weather_model.dart';
 import '../providers/city_provider.dart';
 import 'dart:math';
 import '../constants/app_colors.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
+import 'dart:io';
 
 class ClientHomeScreen extends StatefulWidget {
   const ClientHomeScreen({super.key});
@@ -37,6 +43,11 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
+  // Add this variable for profile image
+  final ImagePicker _imagePicker = ImagePicker();
+  File? _profileImage;
+  static const String _profileImagePathKey = 'profile_image_path';
+
   // Add notification badge counter
   int _notificationCount = 3;
   bool _showNotificationBadge = true;
@@ -49,6 +60,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
     super.initState();
     _initializeWeatherStream();
     startTimer();
+    _loadProfileImage();
 
     // Animation setup
     _animationController = AnimationController(
@@ -105,7 +117,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
 
   void _initializeWeatherStream() {
     weatherStream = Stream.fromFuture(
-      WeatherService().getFiveDayForecast('Islamabad'),
+      WeatherService().getFiveDayForecast('Multan'),
     ).handleError((error) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -146,6 +158,8 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.start,
                         children: [
                           _buildCompactWeatherAlert(context),
                           _buildEventCountdown(context),
@@ -155,6 +169,8 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
                               horizontal: 20.0,
                             ),
                             child: Row(
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.max,
                               children: [
                                 Container(
                                   width: 3,
@@ -200,252 +216,318 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
         displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
 
     return Drawer(
-      child: Container(
-        color: Colors.white,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            UserAccountsDrawerHeader(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF9D9DCC), Color(0xFF7575A8)],
-                ),
-              ),
-              currentAccountPicture: CircleAvatar(
-                backgroundColor: Colors.white,
-                child: Text(
-                  avatarText,
-                  style: const TextStyle(
-                    color: Color(0xFF9D9DCC),
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              accountName: Text(
-                displayName,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-              accountEmail: Text(
-                email,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-              ),
+      backgroundColor: Colors.transparent,
+      child: SafeArea(
+        child: Container(
+          margin: const EdgeInsets.only(
+            right: 1,
+          ), // Small margin to eliminate any gap
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topRight: Radius.circular(20),
+              bottomRight: Radius.circular(20),
             ),
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  // Account section
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      left: 20,
-                      top: 16,
-                      bottom: 8,
-                    ),
-                    child: Text(
-                      'Account',
-                      style: TextStyle(
-                        color: Colors.black87,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF9D9DCC), Color(0xFF7575A8)],
                   ),
-                  _buildDrawerTile(
-                    context,
-                    icon: Icons.account_circle,
-                    title: 'My Account',
-                    onTap: () {
-                      Navigator.pop(context);
-                      // Navigation will be added later
-                    },
-                  ),
-                  // Divider
-                  Padding(
-                    padding: const EdgeInsets.only(left: 20, right: 20),
-                    child: Divider(color: Colors.grey[200], height: 1),
-                  ),
-                  _buildDrawerTile(
-                    context,
-                    icon: Icons.people,
-                    title: 'Invite friends',
-                    onTap: () {
-                      Navigator.pop(context);
-                      // Navigation will be added later
-                    },
-                  ),
-
-                  // Perks section
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      left: 20,
-                      top: 24,
-                      bottom: 8,
-                    ),
-                    child: Text(
-                      'Perks for you',
-                      style: TextStyle(
-                        color: Colors.black87,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  _buildDrawerTile(
-                    context,
-                    icon: Icons.star,
-                    title: 'Become a pro',
-                    onTap: () {
-                      Navigator.pop(context);
-                      // Navigation will be added later
-                    },
-                  ),
-                  // Divider
-                  Padding(
-                    padding: const EdgeInsets.only(left: 20, right: 20),
-                    child: Divider(color: Colors.grey[200], height: 1),
-                  ),
-                  _buildDrawerTile(
-                    context,
-                    icon: Icons.emoji_events,
-                    title: 'PlanIt rewards',
-                    onTap: () {
-                      Navigator.pop(context);
-                      // Navigation will be added later
-                    },
-                  ),
-                  // Divider
-                  Padding(
-                    padding: const EdgeInsets.only(left: 20, right: 20),
-                    child: Divider(color: Colors.grey[200], height: 1),
-                  ),
-                  _buildDrawerTile(
-                    context,
-                    icon: Icons.card_giftcard,
-                    title: 'Vouchers',
-                    onTap: () {
-                      Navigator.pop(context);
-                      // Navigation will be added later
-                    },
-                  ),
-
-                  // General section
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      left: 20,
-                      top: 24,
-                      bottom: 8,
-                    ),
-                    child: Text(
-                      'General',
-                      style: TextStyle(
-                        color: Colors.black87,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  _buildDrawerTile(
-                    context,
-                    icon: Icons.help_outline,
-                    title: 'Help center',
-                    onTap: () {
-                      Navigator.pop(context);
-                      // Navigation will be added later
-                    },
-                  ),
-                  // Divider
-                  Padding(
-                    padding: const EdgeInsets.only(left: 20, right: 20),
-                    child: Divider(color: Colors.grey[200], height: 1),
-                  ),
-                  _buildDrawerTile(
-                    context,
-                    icon: Icons.policy,
-                    title: 'Terms & policies',
-                    onTap: () {
-                      Navigator.pop(context);
-                      // Navigation will be added later
-                    },
-                  ),
-
-                  // Logout button
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Container(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const LoginView(),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 25,
+                  horizontal: 20,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        // Navigate to Account screen instead of showing dialog
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) => AccountScreen(
+                                  onProfileImageChanged: _loadProfileImage,
+                                ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 8,
+                              spreadRadius: 2,
                             ),
-                          );
-                        },
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          side: BorderSide(color: Colors.grey[300]!),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
+                          ],
                         ),
-                        child: const Text(
-                          'Log out',
-                          style: TextStyle(
-                            color: Colors.black87,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
+                        child: CircleAvatar(
+                          radius: 40,
+                          backgroundColor: Colors.grey[200],
+                          backgroundImage:
+                              _profileImage != null
+                                  ? FileImage(_profileImage!)
+                                  : null,
+                          child:
+                              _profileImage == null
+                                  ? Text(
+                                    avatarText,
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                  : null,
                         ),
                       ),
                     ),
-                  ),
-                  // Version info with beta tag
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16.0, top: 8.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Version 1.0.0',
-                          style: TextStyle(
-                            color: Colors.grey[500],
-                            fontSize: 12,
-                          ),
+                    const SizedBox(height: 12),
+                    Text(
+                      displayName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                      textAlign: TextAlign.start,
+                      overflow: TextOverflow.visible,
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    // Account section
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        left: 20,
+                        top: 16,
+                        bottom: 8,
+                      ),
+                      child: Text(
+                        'Account',
+                        style: TextStyle(
+                          color: Colors.black87,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
                         ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
+                      ),
+                    ),
+                    _buildDrawerTile(
+                      context,
+                      icon: Icons.account_circle,
+                      title: 'My Account',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) => AccountScreen(
+                                  onProfileImageChanged: _loadProfileImage,
+                                ),
                           ),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(4),
+                        );
+                      },
+                    ),
+                    // Divider
+                    Padding(
+                      padding: const EdgeInsets.only(left: 20, right: 20),
+                      child: Divider(color: Colors.grey[200], height: 1),
+                    ),
+                    _buildDrawerTile(
+                      context,
+                      icon: Icons.people,
+                      title: 'Invite friends',
+                      onTap: () {
+                        Navigator.pop(context);
+                        // Navigation will be added later
+                      },
+                    ),
+
+                    // Perks section
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        left: 20,
+                        top: 24,
+                        bottom: 8,
+                      ),
+                      child: Text(
+                        'Perks for you',
+                        style: TextStyle(
+                          color: Colors.black87,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    _buildDrawerTile(
+                      context,
+                      icon: Icons.star,
+                      title: 'Become a pro',
+                      onTap: () {
+                        Navigator.pop(context);
+                        // Navigation will be added later
+                      },
+                    ),
+                    // Divider
+                    Padding(
+                      padding: const EdgeInsets.only(left: 20, right: 20),
+                      child: Divider(color: Colors.grey[200], height: 1),
+                    ),
+                    _buildDrawerTile(
+                      context,
+                      icon: Icons.emoji_events,
+                      title: 'PlanIt rewards',
+                      onTap: () {
+                        Navigator.pop(context);
+                        // Navigation will be added later
+                      },
+                    ),
+                    // Divider
+                    Padding(
+                      padding: const EdgeInsets.only(left: 20, right: 20),
+                      child: Divider(color: Colors.grey[200], height: 1),
+                    ),
+                    _buildDrawerTile(
+                      context,
+                      icon: Icons.card_giftcard,
+                      title: 'Vouchers',
+                      onTap: () {
+                        Navigator.pop(context);
+                        // Navigation will be added later
+                      },
+                    ),
+
+                    // General section
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        left: 20,
+                        top: 24,
+                        bottom: 8,
+                      ),
+                      child: Text(
+                        'General',
+                        style: TextStyle(
+                          color: Colors.black87,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    _buildDrawerTile(
+                      context,
+                      icon: Icons.help_outline,
+                      title: 'Help center',
+                      onTap: () {
+                        Navigator.pop(context);
+                        // Navigation will be added later
+                      },
+                    ),
+                    // Divider
+                    Padding(
+                      padding: const EdgeInsets.only(left: 20, right: 20),
+                      child: Divider(color: Colors.grey[200], height: 1),
+                    ),
+                    _buildDrawerTile(
+                      context,
+                      icon: Icons.policy,
+                      title: 'Terms & policies',
+                      onTap: () {
+                        Navigator.pop(context);
+                        // Navigation will be added later
+                      },
+                    ),
+
+                    // Logout button
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Container(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const LoginView(),
+                              ),
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            side: BorderSide(color: Colors.grey[300]!),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
                           child: const Text(
-                            'BETA - Multan only',
+                            'Log out',
                             style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
+                              color: Colors.black87,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                    // Version info with beta tag
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0, top: 8.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Version 1.0.0',
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'BETA - Multan only',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1826,10 +1908,15 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
                                 Future.delayed(Duration(seconds: 1), () {
                                   // Here is where you would integrate with Firebase
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text("Support ticket sent!"),
-                                      backgroundColor: Color(0xFF9D9DCC),
-                                      duration: Duration(seconds: 2),
+                                    const SnackBar(
+                                      content: Text(
+                                        "Support ticket sent!",
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      backgroundColor: Colors.green,
                                     ),
                                   );
 
@@ -1966,6 +2053,136 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
         ],
       ),
     );
+  }
+
+  // Load profile image from shared preferences
+  Future<void> _loadProfileImage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final imagePath = prefs.getString(_profileImagePathKey);
+
+      if (imagePath != null) {
+        final file = File(imagePath);
+        if (await file.exists()) {
+          setState(() {
+            _profileImage = file;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading profile image: $e');
+      // Don't show error to user, just fail silently
+    }
+  }
+
+  // Save profile image path to shared preferences
+  Future<void> _saveProfileImagePath(String imagePath) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_profileImagePathKey, imagePath);
+    } catch (e) {
+      print('Error saving profile image path: $e');
+      // Show a more specific error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not save profile settings, but your image was updated.',
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+  }
+
+  // Function to pick image
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? pickedImage = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 400,
+        maxHeight: 400,
+        imageQuality: 85,
+      );
+
+      if (pickedImage != null) {
+        // Copy the image to app directory for persistence
+        final appDir = await getApplicationDocumentsDirectory();
+        final fileName =
+            'client_profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final savedImagePath = path.join(appDir.path, fileName);
+
+        // Copy the image
+        final File savedImage = await File(
+          pickedImage.path,
+        ).copy(savedImagePath);
+
+        setState(() {
+          _profileImage = savedImage;
+        });
+
+        // Save the path for future app launches
+        await _saveProfileImagePath(savedImagePath);
+
+        // Here you would typically upload to Firebase Storage
+        // For now, just show a success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Profile picture updated!',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error picking image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // Delete profile image
+  Future<void> _deleteProfileImage() async {
+    try {
+      // Remove image path from shared preferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_profileImagePathKey);
+
+      // Delete the file if it exists
+      if (_profileImage != null && await _profileImage!.exists()) {
+        await _profileImage!.delete();
+      }
+
+      setState(() {
+        _profileImage = null;
+      });
+
+      // Show a success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Profile picture removed',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      print('Error deleting profile image: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not remove profile picture: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }
 

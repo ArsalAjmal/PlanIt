@@ -49,5 +49,9 @@
 	<string>This app needs access to location to show weather for your current location.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>This app needs access to location to show weather for your current location.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs camera access to take profile pictures</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to your photo library to select profile pictures</string>
 </dict>
 </plist>

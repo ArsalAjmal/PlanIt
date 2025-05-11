@@ -18,6 +18,10 @@ class ResponseModel {
   final String additionalNotes;
   final String status; // 'pending', 'accepted', 'rejected'
   final DateTime createdAt;
+  final String address;
+  final String apartment;
+  final String city;
+  final String phoneNumber;
 
   ResponseModel({
     required this.id,
@@ -36,6 +40,10 @@ class ResponseModel {
     required this.additionalNotes,
     required this.status,
     required this.createdAt,
+    this.address = '',
+    this.apartment = '',
+    this.city = '',
+    this.phoneNumber = '',
   });
 
   Map<String, dynamic> toMap() {
@@ -56,6 +64,10 @@ class ResponseModel {
       'additionalNotes': additionalNotes,
       'status': status,
       'createdAt': createdAt.toIso8601String(),
+      'address': address,
+      'apartment': apartment,
+      'city': city,
+      'phoneNumber': phoneNumber,
     };
   }
 
@@ -81,6 +93,10 @@ class ResponseModel {
       createdAt: DateTime.parse(
         map['createdAt'] ?? DateTime.now().toIso8601String(),
       ),
+      address: map['address'] ?? '',
+      apartment: map['apartment'] ?? '',
+      city: map['city'] ?? '',
+      phoneNumber: map['phoneNumber'] ?? '',
     );
   }
 }

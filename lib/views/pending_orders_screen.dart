@@ -499,6 +499,25 @@ class _PendingOrdersScreenState extends State<PendingOrdersScreen>
                 _order!.needsPhotographer ? 'Required' : 'Not Required',
               ),
               const SizedBox(height: 12),
+
+              _buildInfoRow(Icons.home, 'Address', _order!.address),
+              const SizedBox(height: 12),
+
+              if (_order!.apartment.isNotEmpty) ...[
+                _buildInfoRow(
+                  Icons.apartment,
+                  'Apartment/Suite',
+                  _order!.apartment,
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              _buildInfoRow(Icons.location_city, 'City', _order!.city),
+              const SizedBox(height: 12),
+
+              _buildInfoRow(Icons.phone, 'Phone', _order!.phoneNumber),
+              const SizedBox(height: 12),
+
               _buildInfoRow(
                 Icons.notes,
                 'Notes',

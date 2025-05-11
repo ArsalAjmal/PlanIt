@@ -11,10 +11,14 @@ import 'views/organizer_search_screen.dart';
 import 'views/order_history_screen.dart';
 import 'views/client/portfolio_debug_screen.dart';
 import 'providers/city_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Initialize SharedPreferences
+  await SharedPreferences.getInstance();
 
   // Set preferred orientations to portrait only
   SystemChrome.setPreferredOrientations([

@@ -44,8 +44,8 @@ class _WeatherScreenState extends State<WeatherScreen> {
             duration: Duration(seconds: 3),
           ),
         );
-        // Default to Islamabad if services are not enabled
-        _loadWeatherData('Islamabad');
+        // Default to Multan if services are not enabled
+        _loadWeatherData('Multan');
         return;
       }
 
@@ -64,7 +64,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
               duration: Duration(seconds: 3),
             ),
           );
-          _loadWeatherData('Islamabad');
+          _loadWeatherData('Multan');
           return;
         }
       }
@@ -78,7 +78,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
             duration: Duration(seconds: 3),
           ),
         );
-        _loadWeatherData('Islamabad');
+        _loadWeatherData('Multan');
         return;
       }
 
@@ -86,7 +86,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
       _getCurrentCity();
     } catch (e) {
       print('Error requesting location permission: $e');
-      _loadWeatherData('Islamabad');
+      _loadWeatherData('Multan');
     }
   }
 
@@ -113,7 +113,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
         final city =
             placemarks[0].locality ??
             placemarks[0].subAdministrativeArea ??
-            'Islamabad';
+            'Multan';
 
         // Update city in provider
         context.read<CityProvider>().updateCity(city);
@@ -127,7 +127,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
         _loadWeatherData(city);
       } else {
         // No placemarks found
-        _loadWeatherData('Islamabad');
+        _loadWeatherData('Multan');
       }
     } catch (e) {
       print('Error getting current city: $e');
@@ -141,7 +141,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
             duration: const Duration(seconds: 3),
           ),
         );
-        _loadWeatherData('Islamabad');
+        _loadWeatherData('Multan');
       }
     }
   }
@@ -288,7 +288,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                           onPressed:
                               () => _loadWeatherData(
                                 _cityController.text.isEmpty
-                                    ? 'Islamabad'
+                                    ? 'Multan'
                                     : _cityController.text,
                               ),
                           style: ElevatedButton.styleFrom(

@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../models/response_model.dart';
 import '../models/review_model.dart';
 import '../constants/app_colors.dart';
+import '../widgets/firestore_image.dart'
+    as fw; // Import the firestore image widget
 
 class FeedbackScreen extends StatefulWidget {
   final bool isInBottomNavBar;
@@ -26,6 +28,20 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   void initState() {
     super.initState();
     _loadData();
+
+    // Add a delayed refresh to ensure images are loaded
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Force a rebuild shortly after mounting
+      if (mounted) {
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            setState(() {
+              // This empty setState will force a rebuild
+            });
+          }
+        });
+      }
+    });
   }
 
   Future<void> _loadData() async {
@@ -279,6 +295,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     bool canRate,
   ) {
     return Card(
+      key: Key('order_card_${order.id}'),
       color: Colors.white,
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
@@ -286,19 +303,79 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image placeholder at top, full width
+          // Image from Firebase portfolio
           ClipRRect(
-            borderRadius: BorderRadius.only(
+            borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(12),
               topRight: Radius.circular(12),
             ),
-            child: Container(
-              width: double.infinity,
-              height: 150,
-              color: Colors.grey[200],
-              child: Center(
-                child: Icon(Icons.image, color: Colors.grey[400], size: 50),
-              ),
+            child: FutureBuilder<DocumentSnapshot>(
+              future:
+                  FirebaseFirestore.instance
+                      .collection('portfolios')
+                      .doc(order.portfolioId)
+                      .get(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Container(
+                    width: double.infinity,
+                    height: 150,
+                    color: Colors.grey[200],
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF9D9DCC),
+                      ),
+                    ),
+                  );
+                }
+
+                if (snapshot.hasError ||
+                    !snapshot.hasData ||
+                    !snapshot.data!.exists) {
+                  return Container(
+                    width: double.infinity,
+                    height: 150,
+                    color: Colors.grey[200],
+                    child: Center(
+                      child: Icon(
+                        Icons.image,
+                        color: Colors.grey[400],
+                        size: 50,
+                      ),
+                    ),
+                  );
+                }
+
+                final data = snapshot.data!.data() as Map<String, dynamic>;
+                final List<dynamic> images = data['imageUrls'] ?? [];
+
+                if (images.isEmpty) {
+                  return Container(
+                    width: double.infinity,
+                    height: 150,
+                    color: Colors.grey[200],
+                    child: Center(
+                      child: Icon(
+                        Icons.image,
+                        color: Colors.grey[400],
+                        size: 50,
+                      ),
+                    ),
+                  );
+                }
+
+                // Use the Firestore image widget which can handle Firestore references
+                final imageRef = images[0].toString();
+                return Container(
+                  width: double.infinity,
+                  height: 150,
+                  color: Colors.grey[200], // Background while loading
+                  child: fw.FirestoreImage(
+                    imageUrl: imageRef,
+                    fit: BoxFit.cover,
+                  ),
+                );
+              },
             ),
           ),
           // Order details
@@ -420,6 +497,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     ReviewModel review,
   ) {
     return Card(
+      key: Key('rated_order_card_${review.id}'),
       color: Colors.white,
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
@@ -427,19 +505,79 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image placeholder at top, full width
+          // Image from Firebase portfolio
           ClipRRect(
-            borderRadius: BorderRadius.only(
+            borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(12),
               topRight: Radius.circular(12),
             ),
-            child: Container(
-              width: double.infinity,
-              height: 150,
-              color: Colors.grey[200],
-              child: Center(
-                child: Icon(Icons.image, color: Colors.grey[400], size: 50),
-              ),
+            child: FutureBuilder<DocumentSnapshot>(
+              future:
+                  FirebaseFirestore.instance
+                      .collection('portfolios')
+                      .doc(order.portfolioId)
+                      .get(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Container(
+                    width: double.infinity,
+                    height: 150,
+                    color: Colors.grey[200],
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF9D9DCC),
+                      ),
+                    ),
+                  );
+                }
+
+                if (snapshot.hasError ||
+                    !snapshot.hasData ||
+                    !snapshot.data!.exists) {
+                  return Container(
+                    width: double.infinity,
+                    height: 150,
+                    color: Colors.grey[200],
+                    child: Center(
+                      child: Icon(
+                        Icons.image,
+                        color: Colors.grey[400],
+                        size: 50,
+                      ),
+                    ),
+                  );
+                }
+
+                final data = snapshot.data!.data() as Map<String, dynamic>;
+                final List<dynamic> images = data['imageUrls'] ?? [];
+
+                if (images.isEmpty) {
+                  return Container(
+                    width: double.infinity,
+                    height: 150,
+                    color: Colors.grey[200],
+                    child: Center(
+                      child: Icon(
+                        Icons.image,
+                        color: Colors.grey[400],
+                        size: 50,
+                      ),
+                    ),
+                  );
+                }
+
+                // Use the Firestore image widget which can handle Firestore references
+                final imageRef = images[0].toString();
+                return Container(
+                  width: double.infinity,
+                  height: 150,
+                  color: Colors.grey[200], // Background while loading
+                  child: fw.FirestoreImage(
+                    imageUrl: imageRef,
+                    fit: BoxFit.cover,
+                  ),
+                );
+              },
             ),
           ),
           // Order details

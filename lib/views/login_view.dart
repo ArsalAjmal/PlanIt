@@ -8,6 +8,7 @@ import '../utils/gradient_animation.dart';
 import '../views/signup_screen.dart';
 import 'client_home_screen.dart';
 import 'organizer_home_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -21,6 +22,8 @@ class _LoginViewState extends State<LoginView> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _passwordVisible = false;
+  String? _verificationEmail;
+  bool _isResendingEmail = false;
 
   @override
   void dispose() {
@@ -31,42 +34,122 @@ class _LoginViewState extends State<LoginView> {
 
   Future<void> _handleLogin() async {
     if (_formKey.currentState!.validate()) {
-      final success = await context.read<LoginController>().login(
+      final loginController = context.read<LoginController>();
+      final result = await loginController.login(
         _emailController.text,
         _passwordController.text,
       );
-      if (success && mounted) {
-        final userRole = context.read<LoginController>().userRole;
 
-        // Navigate based on user role
-        if (userRole == 'client') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const ClientHomeScreen()),
-          );
-        } else if (userRole == 'organizer') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const OrganizerHomeScreen(),
+      if (result) {
+        // Login success, navigate based on role
+        if (mounted) {
+          final role = loginController.userRole;
+          if (role == 'client') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const ClientHomeScreen()),
+            );
+          } else if (role == 'organizer') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const OrganizerHomeScreen(),
+              ),
+            );
+          }
+        }
+      } else if (loginController.errorMessage?.contains('verify your email') ==
+          true) {
+        // If verification error, double-check status directly with Firebase
+        // This handles cases where the user verified but the cached status hasn't updated
+        final isVerified = await loginController.checkEmailVerificationStatus();
+        if (isVerified) {
+          // User is actually verified, try login again
+          setState(() {
+            _verificationEmail = null; // Clear verification message
+          });
+          // Retry login
+          _handleLogin();
+        } else {
+          // Verification truly needed, show the verification UI
+          setState(() {
+            _verificationEmail = _emailController.text;
+          });
+
+          // Show verification needed message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                loginController.errorMessage ??
+                    'Please verify your email before logging in',
+                style: const TextStyle(color: Colors.white),
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+              behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.all(16),
+              action: SnackBarAction(
+                label: 'Resend',
+                textColor: Colors.white,
+                onPressed: _resendVerificationEmail,
+              ),
             ),
           );
         }
-      } else if (mounted) {
-        // Show error message for invalid credentials
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Invalid email or password. Please try again.',
-              style: TextStyle(color: Colors.white),
+      } else {
+        // Other login error, show snackbar
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                loginController.errorMessage ?? 'Login failed',
+                style: const TextStyle(color: Colors.white),
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.all(16),
             ),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-            margin: EdgeInsets.all(16),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _resendVerificationEmail() async {
+    if (_verificationEmail != null && _passwordController.text.isNotEmpty) {
+      final loginController = context.read<LoginController>();
+
+      // Show loading
+      setState(() {
+        _isResendingEmail = true;
+      });
+
+      final success = await loginController.resendVerificationEmail(
+        _verificationEmail!,
+        _passwordController.text,
+      );
+
+      // Show result
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              success
+                  ? 'Verification email sent to $_verificationEmail'
+                  : 'Failed to send verification email. Please try again.',
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: success ? Colors.green : Colors.red,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
+
+      // Hide loading
+      setState(() {
+        _isResendingEmail = false;
+      });
     }
   }
 
@@ -203,12 +286,19 @@ class _LoginViewState extends State<LoginView> {
                               alignment: Alignment.centerRight,
                               child: GestureDetector(
                                 onTap: () {
-                                  // Forgot password functionality will be added later
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) =>
+                                              const ForgotPasswordScreen(),
+                                    ),
+                                  );
                                 },
                                 child: Text(
                                   'Forgot Password?',
                                   style: TextStyle(
-                                    color: const Color(0xFF9D9DCC),
+                                    color: Colors.black87,
                                     fontWeight: FontWeight.w500,
                                     fontSize: 14,
                                   ),
@@ -255,21 +345,77 @@ class _LoginViewState extends State<LoginView> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
-                                  "Don't have an account? ",
-                                  style: TextStyle(color: Colors.grey[600]),
+                                  'Don\'t have an account? ',
+                                  style: TextStyle(
+                                    color: Colors.black87,
+                                    fontSize: 14,
+                                  ),
                                 ),
                                 GestureDetector(
                                   onTap: _navigateToSignUp,
-                                  child: const Text(
-                                    "Sign Up",
+                                  child: Text(
+                                    'Sign up',
                                     style: TextStyle(
-                                      color: Color(0xFF9D9DCC),
+                                      color: const Color(0xFF9D9DCC),
                                       fontWeight: FontWeight.bold,
+                                      fontSize: 14,
                                     ),
                                   ),
                                 ),
                               ],
                             ),
+
+                            // Verification Email Reminder
+                            if (_verificationEmail != null) ...[
+                              const SizedBox(height: 16),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.red.shade300,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      "Email Verification Required",
+                                      style: TextStyle(
+                                        color: Colors.red,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      "Please verify ${_verificationEmail} before logging in.",
+                                      style: TextStyle(
+                                        color: Colors.red.shade700,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: TextButton(
+                                        onPressed: _resendVerificationEmail,
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: Colors.red,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 4,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          "Resend Verification Email",
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),

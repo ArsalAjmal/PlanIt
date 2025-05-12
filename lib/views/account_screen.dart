@@ -33,13 +33,17 @@ class _AccountScreenState extends State<AccountScreen> {
 
   // Profile image handling
   File? _profileImage;
-  static const String _profileImagePathKey = 'profile_image_path';
+  static const String _clientProfileImagePathKey = 'client_profile_image_path';
+  static const String _organizerProfileImagePathKey =
+      'organizer_profile_image_path';
+  bool _isOrganizer = false;
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
-    _loadProfileImage();
+    _checkUserType();
+    _clearCrossOverProfileImages();
   }
 
   Future<void> _loadUserData() async {
@@ -109,8 +113,8 @@ class _AccountScreenState extends State<AccountScreen> {
               _password = '•' * 14;
             }
 
-            // Note: We don't retrieve the password as it should be stored as a hash
-            // and not in plaintext for security reasons
+            // Check for stored profile image paths
+            await _checkForStoredProfileImage(userData);
           }
         }
       } catch (e) {
@@ -125,32 +129,230 @@ class _AccountScreenState extends State<AccountScreen> {
     }
   }
 
+  // New method to check for stored profile image paths in Firestore
+  Future<void> _checkForStoredProfileImage(
+    Map<String, dynamic> userData,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userType = _isOrganizer ? 'organizer' : 'client';
+
+      // Check if path exists in Firestore
+      if (userData['${userType}ProfileImagePath'] != null) {
+        final storedPath = userData['${userType}ProfileImagePath'] as String;
+        print(
+          'AccountScreen: Found ${userType} profile image path in Firestore: $storedPath',
+        );
+
+        // Check if file exists
+        final file = File(storedPath);
+        if (await file.exists()) {
+          // Update SharedPreferences and state
+          final key =
+              _isOrganizer
+                  ? _organizerProfileImagePathKey
+                  : _clientProfileImagePathKey;
+          await prefs.setString(key, storedPath);
+          setState(() {
+            _profileImage = file;
+          });
+
+          print(
+            'AccountScreen: Successfully restored profile image from Firestore',
+          );
+        } else {
+          print(
+            'AccountScreen: Stored image file no longer exists: $storedPath',
+          );
+          // Remove invalid path from Firestore
+          final user = _auth.currentUser;
+          if (user != null) {
+            await _firestore.collection('users').doc(user.uid).update({
+              '${userType}ProfileImagePath': FieldValue.delete(),
+            });
+          }
+        }
+      } else {
+        print(
+          'AccountScreen: No ${userType} profile image path stored in Firestore',
+        );
+      }
+    } catch (e) {
+      print('AccountScreen: Error checking for stored profile image: $e');
+    }
+  }
+
+  Future<void> _checkUserType() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        // First check user_role in SharedPreferences - highest priority
+        final prefs = await SharedPreferences.getInstance();
+        String? userRole = prefs.getString('user_role');
+        if (userRole != null) {
+          setState(() {
+            _isOrganizer = userRole == 'organizer';
+          });
+          print(
+            'AccountScreen: Determined user type from SharedPreferences user_role: $_isOrganizer',
+          );
+          _loadProfileImage();
+          return; // Exit early, we have our answer
+        }
+
+        // Check the user's role in Firestore
+        final userDoc =
+            await _firestore.collection('users').doc(user.uid).get();
+        print('AccountScreen: Checking user type for ${user.uid}');
+
+        bool foundUserType = false;
+
+        if (userDoc.exists && userDoc.data() != null) {
+          final userData = userDoc.data()!;
+          final bool wasOrganizer = _isOrganizer;
+
+          // Check if role field exists
+          if (userData.containsKey('role')) {
+            setState(() {
+              _isOrganizer = userData['role'] == 'organizer';
+            });
+            foundUserType = true;
+            print(
+              'AccountScreen: isOrganizer = $_isOrganizer (was $wasOrganizer), role = ${userData['role']}',
+            );
+          } else {
+            print('AccountScreen: User document does not contain role field');
+          }
+        } else {
+          print('AccountScreen: User document not found or has no data');
+        }
+
+        // If we can't determine from Firestore, check which screens the user can access
+        if (!foundUserType) {
+          // Try to determine from SharedPreferences keys
+          final hasOrganizerImage = prefs.containsKey(
+            _organizerProfileImagePathKey,
+          );
+          final hasClientImage = prefs.containsKey(_clientProfileImagePathKey);
+
+          if (hasOrganizerImage && !hasClientImage) {
+            setState(() {
+              _isOrganizer = true;
+            });
+            print(
+              'AccountScreen: Determined user is organizer from SharedPreferences',
+            );
+          } else if (!hasOrganizerImage && hasClientImage) {
+            setState(() {
+              _isOrganizer = false;
+            });
+            print(
+              'AccountScreen: Determined user is client from SharedPreferences',
+            );
+          }
+          // If both or neither exist, we can't determine - keep current value
+        }
+
+        // Store the detected role for future use
+        if (userRole == null) {
+          await prefs.setString(
+            'user_role',
+            _isOrganizer ? 'organizer' : 'client',
+          );
+          print(
+            'AccountScreen: Storing detected user role: ${_isOrganizer ? "organizer" : "client"}',
+          );
+        }
+      } else {
+        print('AccountScreen: User is null');
+      }
+
+      // Load profile image after determining user type
+      _loadProfileImage();
+    } catch (e) {
+      print('AccountScreen: Error checking user type: $e');
+      _loadProfileImage(); // Load profile image anyway
+    }
+  }
+
   // Load profile image from shared preferences
   Future<void> _loadProfileImage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final imagePath = prefs.getString(_profileImagePathKey);
+      final key =
+          _isOrganizer
+              ? _organizerProfileImagePathKey
+              : _clientProfileImagePathKey;
+      print(
+        'AccountScreen: Loading profile image with key: $key, isOrganizer: $_isOrganizer',
+      );
+
+      // Only check the key for the current user type - don't use alternate keys
+      String? imagePath = prefs.getString(key);
+      print('AccountScreen: Found image path: $imagePath for key: $key');
 
       if (imagePath != null) {
         final file = File(imagePath);
-        if (await file.exists()) {
+        final exists = await file.exists();
+        print('AccountScreen: File exists: $exists');
+
+        if (exists) {
           setState(() {
             _profileImage = file;
+            print('AccountScreen: Set profile image to $imagePath');
           });
+        } else {
+          print('AccountScreen: Image file not found at path: $imagePath');
+          // Remove only this key if file doesn't exist
+          await prefs.remove(key);
+          print(
+            'AccountScreen: Removed non-existent image path from key: $key',
+          );
         }
+      } else {
+        print('AccountScreen: No image path stored for key: $key');
       }
     } catch (e) {
-      print('Error loading profile image: $e');
+      print('AccountScreen: Error loading profile image: $e');
     }
   }
 
   // Save profile image path to shared preferences
   Future<void> _saveProfileImagePath(String imagePath) async {
     try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        print('AccountScreen: Cannot save profile image - user is null');
+        return;
+      }
+
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_profileImagePathKey, imagePath);
+      final key =
+          _isOrganizer
+              ? _organizerProfileImagePathKey
+              : _clientProfileImagePathKey;
+      print(
+        'AccountScreen: Saving profile image path: $imagePath with key: $key, isOrganizer: $_isOrganizer',
+      );
+
+      // Save locally to SharedPreferences
+      await prefs.setString(key, imagePath);
+
+      // Store in Firestore to persist across logins
+      final userType = _isOrganizer ? 'organizer' : 'client';
+      await _firestore.collection('users').doc(user.uid).update({
+        '${userType}ProfileImagePath': imagePath,
+        'lastProfileUpdate': DateTime.now(),
+      });
+
+      print(
+        'AccountScreen: Saved profile image path to Firestore and SharedPreferences',
+      );
+      print(
+        'AccountScreen: User type is: ${_isOrganizer ? "Organizer" : "Client"}',
+      );
     } catch (e) {
-      print('Error saving profile image path: $e');
+      print('AccountScreen: Error saving profile image path: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -163,9 +365,31 @@ class _AccountScreenState extends State<AccountScreen> {
     }
   }
 
+  // New method to clear any cross-over profile images
+  Future<void> _clearCrossOverProfileImages() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final user = _auth.currentUser;
+
+      // Clear all keys if we detect inconsistencies or if we're switching types
+      final hasOrganizerKey = prefs.containsKey(_organizerProfileImagePathKey);
+      final hasClientKey = prefs.containsKey(_clientProfileImagePathKey);
+
+      // If both keys exist, we need to clear them as this indicates a problem
+      if (hasOrganizerKey && hasClientKey) {
+        print('AccountScreen: Found both keys, clearing all profile images');
+        await prefs.remove(_organizerProfileImagePathKey);
+        await prefs.remove(_clientProfileImagePathKey);
+      }
+    } catch (e) {
+      print('AccountScreen: Error clearing cross-over images: $e');
+    }
+  }
+
   // Function to pick image
   Future<void> _pickImage(ImageSource source) async {
     try {
+      print('AccountScreen: Picking image from source: $source');
       final XFile? pickedImage = await _imagePicker.pickImage(
         source: source,
         maxWidth: 400,
@@ -174,15 +398,28 @@ class _AccountScreenState extends State<AccountScreen> {
       );
 
       if (pickedImage != null) {
-        // Copy the image to app directory for persistence
+        print('AccountScreen: Image picked: ${pickedImage.path}');
+        // Copy the image to app directory for persistence with user ID in filename
+        final user = _auth.currentUser;
+        final userId = user?.uid ?? 'unknown';
         final appDir = await getApplicationDocumentsDirectory();
-        final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final userType = _isOrganizer ? 'organizer' : 'client';
+        final fileName =
+            '${userType}_${userId}_profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final savedImagePath = path.join(appDir.path, fileName);
+        print('AccountScreen: Saving image to: $savedImagePath');
+
+        // Delete any existing profile image first
+        if (_profileImage != null && await _profileImage!.exists()) {
+          await _profileImage!.delete();
+          print('AccountScreen: Deleted existing profile image file');
+        }
 
         // Copy the image
         final File savedImage = await File(
           pickedImage.path,
         ).copy(savedImagePath);
+        print('AccountScreen: Image copied successfully to: $savedImagePath');
 
         setState(() {
           _profileImage = savedImage;
@@ -193,7 +430,10 @@ class _AccountScreenState extends State<AccountScreen> {
 
         // Notify parent screens about the change
         if (widget.onProfileImageChanged != null) {
+          print('AccountScreen: Calling onProfileImageChanged callback');
           widget.onProfileImageChanged!();
+        } else {
+          print('AccountScreen: No onProfileImageChanged callback provided');
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -208,6 +448,8 @@ class _AccountScreenState extends State<AccountScreen> {
             backgroundColor: Colors.green,
           ),
         );
+      } else {
+        print('AccountScreen: No image picked');
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -225,13 +467,33 @@ class _AccountScreenState extends State<AccountScreen> {
   // Delete profile image
   Future<void> _deleteProfileImage() async {
     try {
-      // Remove image path from shared preferences
+      final user = _auth.currentUser;
+      if (user == null) {
+        print('AccountScreen: Cannot delete profile image - user is null');
+        return;
+      }
+
+      // Remove image path from SharedPreferences - but only for the current user type
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_profileImagePathKey);
+      final key =
+          _isOrganizer
+              ? _organizerProfileImagePathKey
+              : _clientProfileImagePathKey;
+
+      await prefs.remove(key);
+      print('AccountScreen: Removed profile image path from key: $key');
+
+      // Also remove from Firestore
+      final userType = _isOrganizer ? 'organizer' : 'client';
+      await _firestore.collection('users').doc(user.uid).update({
+        '${userType}ProfileImagePath': FieldValue.delete(),
+      });
+      print('AccountScreen: Removed profile image path from Firestore');
 
       // Delete the file if it exists
       if (_profileImage != null && await _profileImage!.exists()) {
         await _profileImage!.delete();
+        print('AccountScreen: Deleted profile image file');
       }
 
       setState(() {
@@ -393,58 +655,233 @@ class _AccountScreenState extends State<AccountScreen> {
                                         right: 0,
                                         child: GestureDetector(
                                           onTap: () {
-                                            // Show a dialog to select image source
-                                            showDialog(
+                                            // Show a compact profile photo picker
+                                            showModalBottomSheet(
                                               context: context,
+                                              backgroundColor:
+                                                  Colors.transparent,
+                                              isScrollControlled: true,
                                               builder: (BuildContext context) {
-                                                return AlertDialog(
-                                                  title: const Text(
-                                                    'Change Profile Picture',
+                                                return Container(
+                                                  padding:
+                                                      const EdgeInsets.fromLTRB(
+                                                        0,
+                                                        12,
+                                                        0,
+                                                        20,
+                                                      ),
+                                                  decoration: const BoxDecoration(
+                                                    color:
+                                                        AppColors
+                                                            .creamBackground, // App cream background
+                                                    borderRadius:
+                                                        BorderRadius.only(
+                                                          topLeft:
+                                                              Radius.circular(
+                                                                16,
+                                                              ),
+                                                          topRight:
+                                                              Radius.circular(
+                                                                16,
+                                                              ),
+                                                        ),
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: Colors.black12,
+                                                        blurRadius: 8,
+                                                        spreadRadius: 0,
+                                                      ),
+                                                    ],
                                                   ),
-                                                  content: SingleChildScrollView(
-                                                    child: ListBody(
-                                                      children: <Widget>[
-                                                        GestureDetector(
-                                                          child: const ListTile(
-                                                            leading: Icon(
-                                                              Icons
-                                                                  .photo_library,
+                                                  child: Column(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: <Widget>[
+                                                      // Drag handle
+                                                      Container(
+                                                        width: 36,
+                                                        height: 4,
+                                                        margin:
+                                                            const EdgeInsets.only(
+                                                              bottom: 8,
                                                             ),
-                                                            title: Text(
-                                                              'Choose from Gallery',
+                                                        decoration: BoxDecoration(
+                                                          color:
+                                                              Colors
+                                                                  .grey
+                                                                  .shade300,
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                2,
+                                                              ),
+                                                        ),
+                                                      ),
+
+                                                      // Title
+                                                      const Text(
+                                                        'Profile photo',
+                                                        style: TextStyle(
+                                                          fontSize: 16,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color: Colors.black87,
+                                                        ),
+                                                      ),
+
+                                                      const SizedBox(
+                                                        height: 16,
+                                                      ),
+
+                                                      // Option buttons
+                                                      Row(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          // Camera option
+                                                          Padding(
+                                                            padding:
+                                                                const EdgeInsets.symmetric(
+                                                                  horizontal:
+                                                                      16,
+                                                                ),
+                                                            child: Column(
+                                                              children: [
+                                                                GestureDetector(
+                                                                  onTap: () {
+                                                                    Navigator.of(
+                                                                      context,
+                                                                    ).pop();
+                                                                    _pickImage(
+                                                                      ImageSource
+                                                                          .camera,
+                                                                    );
+                                                                  },
+                                                                  child: Container(
+                                                                    width: 55,
+                                                                    height: 55,
+                                                                    decoration: BoxDecoration(
+                                                                      shape:
+                                                                          BoxShape
+                                                                              .circle,
+                                                                      border: Border.all(
+                                                                        color:
+                                                                            Colors.black87, // Black outline
+                                                                        width:
+                                                                            1.0,
+                                                                      ),
+                                                                    ),
+                                                                    child: const Center(
+                                                                      child: Icon(
+                                                                        Icons
+                                                                            .camera_alt_rounded,
+                                                                        color:
+                                                                            Colors.black87,
+                                                                        size:
+                                                                            22,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                const SizedBox(
+                                                                  height: 6,
+                                                                ),
+                                                                const Text(
+                                                                  'Camera',
+                                                                  style: TextStyle(
+                                                                    color:
+                                                                        Colors
+                                                                            .black87,
+                                                                    fontSize:
+                                                                        13,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w500,
+                                                                  ),
+                                                                ),
+                                                              ],
                                                             ),
                                                           ),
-                                                          onTap: () {
-                                                            Navigator.of(
-                                                              context,
-                                                            ).pop();
-                                                            _pickImage(
-                                                              ImageSource
-                                                                  .gallery,
-                                                            );
-                                                          },
-                                                        ),
-                                                        GestureDetector(
-                                                          child: const ListTile(
-                                                            leading: Icon(
-                                                              Icons.camera_alt,
-                                                            ),
-                                                            title: Text(
-                                                              'Take a Photo',
+
+                                                          // Gallery option
+                                                          Padding(
+                                                            padding:
+                                                                const EdgeInsets.symmetric(
+                                                                  horizontal:
+                                                                      16,
+                                                                ),
+                                                            child: Column(
+                                                              children: [
+                                                                GestureDetector(
+                                                                  onTap: () {
+                                                                    Navigator.of(
+                                                                      context,
+                                                                    ).pop();
+                                                                    _pickImage(
+                                                                      ImageSource
+                                                                          .gallery,
+                                                                    );
+                                                                  },
+                                                                  child: Container(
+                                                                    width: 55,
+                                                                    height: 55,
+                                                                    decoration: BoxDecoration(
+                                                                      shape:
+                                                                          BoxShape
+                                                                              .circle,
+                                                                      border: Border.all(
+                                                                        color:
+                                                                            Colors.black87, // Black outline
+                                                                        width:
+                                                                            1.0,
+                                                                      ),
+                                                                    ),
+                                                                    child: const Center(
+                                                                      child: Icon(
+                                                                        Icons
+                                                                            .photo_library_rounded,
+                                                                        color:
+                                                                            Colors.black87,
+                                                                        size:
+                                                                            22,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                const SizedBox(
+                                                                  height: 6,
+                                                                ),
+                                                                const Text(
+                                                                  'Gallery',
+                                                                  style: TextStyle(
+                                                                    color:
+                                                                        Colors
+                                                                            .black87,
+                                                                    fontSize:
+                                                                        13,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w500,
+                                                                  ),
+                                                                ),
+                                                              ],
                                                             ),
                                                           ),
-                                                          onTap: () {
-                                                            Navigator.of(
+                                                        ],
+                                                      ),
+
+                                                      const SizedBox(
+                                                        height: 16,
+                                                      ),
+
+                                                      // Bottom padding for safe area
+                                                      SizedBox(
+                                                        height:
+                                                            MediaQuery.of(
                                                               context,
-                                                            ).pop();
-                                                            _pickImage(
-                                                              ImageSource
-                                                                  .camera,
-                                                            );
-                                                          },
-                                                        ),
-                                                      ],
-                                                    ),
+                                                            ).padding.bottom,
+                                                      ),
+                                                    ],
                                                   ),
                                                 );
                                               },
@@ -472,36 +909,6 @@ class _AccountScreenState extends State<AccountScreen> {
                                           ),
                                         ),
                                       ),
-
-                                      // Delete icon (only visible when there's a profile image)
-                                      if (_profileImage != null)
-                                        Positioned(
-                                          bottom: 0,
-                                          left: 0,
-                                          child: GestureDetector(
-                                            onTap: _deleteProfileImage,
-                                            child: Container(
-                                              padding: const EdgeInsets.all(4),
-                                              decoration: BoxDecoration(
-                                                color: Colors.red,
-                                                shape: BoxShape.circle,
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: Colors.black
-                                                        .withOpacity(0.1),
-                                                    blurRadius: 4,
-                                                    offset: const Offset(0, 2),
-                                                  ),
-                                                ],
-                                              ),
-                                              child: const Icon(
-                                                Icons.delete,
-                                                color: Colors.white,
-                                                size: 16,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
                                     ],
                                   ),
                                   const SizedBox(height: 10),

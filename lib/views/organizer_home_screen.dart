@@ -19,6 +19,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class OrganizerHomeScreen extends StatefulWidget {
   const OrganizerHomeScreen({super.key});
@@ -28,7 +29,7 @@ class OrganizerHomeScreen extends StatefulWidget {
 }
 
 class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   // Controller for pending orders
   final PendingOrdersController _pendingOrdersController =
       PendingOrdersController();
@@ -52,15 +53,56 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
   // Add this variable for profile image
   final ImagePicker _imagePicker = ImagePicker();
   File? _profileImage;
-  static const String _profileImagePathKey = 'profile_image_path';
+  String? _profileImagePath; // Add this to track the path
+  static const String _profileImagePathKey = 'organizer_profile_image_path';
+  static const String _clientProfileImagePathKey = 'client_profile_image_path';
+  bool _profileImageLoaded = false; // Track if we've tried to load the image
+
+  // Add event management variables
+  int _currentEventIndex = 0;
+  late PageController _eventPageController;
+  final List<Map<String, dynamic>> _events = [
+    {
+      'title': 'Summer Wedding',
+      'date': DateTime.now().add(
+        const Duration(days: 10, hours: 12, minutes: 30, seconds: 6),
+      ),
+    },
+    {
+      'title': 'Birthday Party',
+      'date': DateTime.now().add(
+        const Duration(days: 5, hours: 8, minutes: 45, seconds: 30),
+      ),
+    },
+    {
+      'title': 'Corporate Event',
+      'date': DateTime.now().add(
+        const Duration(days: 15, hours: 3, minutes: 20, seconds: 15),
+      ),
+    },
+    {
+      'title': 'Anniversary Celebration',
+      'date': DateTime.now().add(
+        const Duration(days: 2, hours: 14, minutes: 30),
+      ),
+    },
+  ];
 
   @override
   void initState() {
     super.initState();
+    // Register for lifecycle changes
+    WidgetsBinding.instance.addObserver(this);
+
     _loadPendingOrders();
     _debugCheckAllResponses();
     startTimer();
+    _clearCrossProfileImages();
     _loadProfileImage();
+    _eventPageController = PageController(
+      initialPage: 0,
+      viewportFraction: 0.95, // Slightly smaller to show a hint of next page
+    );
 
     // Animation setup
     _animationController = AnimationController(
@@ -79,7 +121,25 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
   void dispose() {
     _timer.cancel();
     _animationController.dispose();
+    _eventPageController.dispose();
+    // Remove observer
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  // React to app lifecycle changes
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // App came back to foreground, reload profile image
+      print('OrganizerHomeScreen: App resumed, reloading profile image');
+      setState(() {
+        _profileImageLoaded = false;
+        _profileImage = null;
+        _profileImagePath = null;
+      });
+      _loadProfileImage();
+    }
   }
 
   void startTimer() {
@@ -139,33 +199,202 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
     await portfolioService.debugCheckAllResponses();
   }
 
-  // Load profile image from shared preferences
-  Future<void> _loadProfileImage() async {
+  // Clear any potential cross-contamination between client and organizer images
+  Future<void> _clearCrossProfileImages() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final imagePath = prefs.getString(_profileImagePathKey);
 
-      if (imagePath != null) {
-        final file = File(imagePath);
-        if (await file.exists()) {
-          setState(() {
-            _profileImage = file;
-          });
+      // Add this check to make sure we're enforcing the organizer role
+      // Store user role in SharedPreferences to ensure consistency
+      await prefs.setString('user_role', 'organizer');
+
+      // Check if client key exists and remove it to prevent contamination
+      if (prefs.containsKey(_clientProfileImagePathKey)) {
+        print(
+          'OrganizerHomeScreen: Found client key in organizer screen, removing it',
+        );
+        await prefs.remove(_clientProfileImagePathKey);
+      }
+
+      // Also verify the organizer image path points to an existing file
+      final organizerPath = prefs.getString(_profileImagePathKey);
+      if (organizerPath != null) {
+        final file = File(organizerPath);
+        if (!await file.exists()) {
+          print(
+            'OrganizerHomeScreen: Organizer image file does not exist, removing path',
+          );
+          await prefs.remove(_profileImagePathKey);
         }
       }
     } catch (e) {
-      print('Error loading profile image: $e');
-      // Don't show error to user, just fail silently
+      print('OrganizerHomeScreen: Error clearing cross profile images: $e');
+    }
+  }
+
+  // Load profile image from shared preferences
+  Future<void> _loadProfileImage() async {
+    // Early return if already loading to prevent loops
+    if (_profileImageLoaded) {
+      print('OrganizerHomeScreen: Profile image already loaded, skipping');
+      return;
+    }
+
+    print('OrganizerHomeScreen: _loadProfileImage called');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Ensure we're using the right user role
+      final userRole = prefs.getString('user_role');
+      if (userRole != null && userRole != 'organizer') {
+        print(
+          'OrganizerHomeScreen: User role mismatch in SharedPreferences: $userRole',
+        );
+        // Force organizer role for this screen
+        await prefs.setString('user_role', 'organizer');
+      }
+
+      // Always reset state first to avoid stale data
+      setState(() {
+        _profileImageLoaded = false;
+        _profileImage = null;
+        _profileImagePath = null;
+      });
+
+      // Only use the organizer key - we don't want to use the client image
+      String? imagePath = prefs.getString(_profileImagePathKey);
+
+      // If not found in SharedPreferences, try to get from Firestore
+      if (imagePath == null) {
+        final user = _auth.currentUser;
+        if (user != null) {
+          try {
+            final userDoc =
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(user.uid)
+                    .get();
+            if (userDoc.exists && userDoc.data() != null) {
+              final userData = userDoc.data()!;
+              if (userData['organizerProfileImagePath'] != null) {
+                imagePath = userData['organizerProfileImagePath'] as String;
+                print(
+                  'OrganizerHomeScreen: Found profile image path in Firestore: $imagePath',
+                );
+
+                // Save to SharedPreferences for future access
+                if (imagePath != null) {
+                  await prefs.setString(_profileImagePathKey, imagePath);
+                }
+              }
+            }
+          } catch (e) {
+            print(
+              'OrganizerHomeScreen: Error retrieving profile image from Firestore: $e',
+            );
+          }
+        }
+      }
+
+      print(
+        'OrganizerHomeScreen: imagePath = $imagePath, current path = $_profileImagePath',
+      );
+
+      // If there's no path, mark as loaded with no image and exit early
+      if (imagePath == null) {
+        setState(() {
+          _profileImage = null;
+          _profileImagePath = null;
+          _profileImageLoaded = true;
+        });
+        print(
+          'OrganizerHomeScreen: No image path found, marked as loaded with no image',
+        );
+        return;
+      }
+
+      // Check if file exists
+      final file = File(imagePath);
+      final exists = await file.exists();
+      print('OrganizerHomeScreen: File exists: $exists at path: $imagePath');
+
+      if (exists) {
+        setState(() {
+          _profileImage = file;
+          _profileImagePath = imagePath;
+          _profileImageLoaded = true;
+          print('OrganizerHomeScreen: Profile image set');
+        });
+        print('OrganizerHomeScreen: Loaded profile image from: $imagePath');
+      } else {
+        // File doesn't exist but path is stored, clear the path
+        print(
+          'OrganizerHomeScreen: Profile image file not found, removing path',
+        );
+        await prefs.remove(_profileImagePathKey);
+
+        // Also remove from Firestore if possible
+        final user = _auth.currentUser;
+        if (user != null) {
+          try {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .update({'organizerProfileImagePath': FieldValue.delete()});
+            print(
+              'OrganizerHomeScreen: Removed invalid image path from Firestore',
+            );
+          } catch (e) {
+            print(
+              'OrganizerHomeScreen: Error removing invalid path from Firestore: $e',
+            );
+          }
+        }
+
+        setState(() {
+          _profileImage = null;
+          _profileImagePath = null;
+          _profileImageLoaded = true;
+          print(
+            'OrganizerHomeScreen: Profile image set to null (file not found)',
+          );
+        });
+      }
+    } catch (e) {
+      print('OrganizerHomeScreen: Error loading profile image: $e');
+      setState(() {
+        _profileImageLoaded = true;
+        _profileImage = null;
+        _profileImagePath = null;
+      });
     }
   }
 
   // Save profile image path to shared preferences
   Future<void> _saveProfileImagePath(String imagePath) async {
     try {
+      print('OrganizerHomeScreen: Saving profile image path: $imagePath');
       final prefs = await SharedPreferences.getInstance();
+
+      // Ensure we're not using the client key
+      if (prefs.containsKey(_clientProfileImagePathKey)) {
+        await prefs.remove(_clientProfileImagePathKey);
+        print('OrganizerHomeScreen: Removed client key for safety');
+      }
+
+      // Always use the organizer key in this screen
       await prefs.setString(_profileImagePathKey, imagePath);
+
+      // Verify we've saved correctly
+      final savedPath = prefs.getString(_profileImagePathKey);
+      print('OrganizerHomeScreen: Verified saved path: $savedPath');
+
+      // Update our state
+      setState(() {
+        _profileImagePath = imagePath;
+      });
     } catch (e) {
-      print('Error saving profile image path: $e');
+      print('OrganizerHomeScreen: Error saving profile image path: $e');
       // Show a more specific error message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -182,6 +411,7 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
   // Function to pick image
   Future<void> _pickImage(ImageSource source) async {
     try {
+      print('OrganizerHomeScreen: Picking image from source: $source');
       final XFile? pickedImage = await _imagePicker.pickImage(
         source: source,
         maxWidth: 400,
@@ -190,19 +420,33 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
       );
 
       if (pickedImage != null) {
-        // Copy the image to app directory for persistence
+        print('OrganizerHomeScreen: Image picked: ${pickedImage.path}');
+
+        // Copy the image to app directory for persistence with user ID
         final appDir = await getApplicationDocumentsDirectory();
+        final userId = _auth.currentUser?.uid ?? 'unknown';
         final fileName =
-            'organizer_profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
+            'organizer_${userId}_profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final savedImagePath = path.join(appDir.path, fileName);
+        print('OrganizerHomeScreen: Saving image to: $savedImagePath');
+
+        // Delete existing profile image if any
+        if (_profileImage != null && await _profileImage!.exists()) {
+          await _profileImage!.delete();
+          print('OrganizerHomeScreen: Deleted existing profile image');
+        }
 
         // Copy the image
         final File savedImage = await File(
           pickedImage.path,
         ).copy(savedImagePath);
+        print('OrganizerHomeScreen: Image copied successfully');
 
         setState(() {
           _profileImage = savedImage;
+          _profileImagePath = savedImagePath; // Update the path
+          _profileImageLoaded = true;
+          print('OrganizerHomeScreen: Updated state with new image');
         });
 
         // Save the path for future app launches
@@ -222,8 +466,11 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
             backgroundColor: Colors.green,
           ),
         );
+      } else {
+        print('OrganizerHomeScreen: No image picked');
       }
     } catch (e) {
+      print('OrganizerHomeScreen: Error picking image: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -239,17 +486,31 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
   // Delete profile image
   Future<void> _deleteProfileImage() async {
     try {
-      // Remove image path from shared preferences
+      print('OrganizerHomeScreen: Deleting profile image');
+      // Remove image path from shared preferences - but only for the current user type
       final prefs = await SharedPreferences.getInstance();
+
+      // Ensure we're only using organizer key
+      if (prefs.containsKey(_clientProfileImagePathKey)) {
+        await prefs.remove(_clientProfileImagePathKey);
+        print('OrganizerHomeScreen: Removed client key during deletion');
+      }
+
       await prefs.remove(_profileImagePathKey);
+      print(
+        'OrganizerHomeScreen: Removed profile image path from key: $_profileImagePathKey',
+      );
 
       // Delete the file if it exists
       if (_profileImage != null && await _profileImage!.exists()) {
         await _profileImage!.delete();
+        print('OrganizerHomeScreen: Deleted profile image file');
       }
 
       setState(() {
         _profileImage = null;
+        _profileImagePath = null;
+        _profileImageLoaded = true;
       });
 
       // Show a success message
@@ -263,13 +524,45 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
         ),
       );
     } catch (e) {
-      print('Error deleting profile image: $e');
+      print('OrganizerHomeScreen: Error deleting profile image: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Could not remove profile picture: $e'),
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  // Make sure we're using the organizer profile image key
+  Future<void> _ensureUsingOrganizerKey() async {
+    try {
+      // Check if there's a client profile image mistakenly being used
+      final prefs = await SharedPreferences.getInstance();
+      final clientPath = prefs.getString(_clientProfileImagePathKey);
+
+      // If there's a profile image in the client key but not in the organizer key,
+      // copy it to the organizer key
+      if (clientPath != null) {
+        final organizerPath = prefs.getString(_profileImagePathKey);
+        if (organizerPath == null) {
+          print(
+            'OrganizerHomeScreen: Found client profile image, copying to organizer key',
+          );
+
+          // Copy path to organizer key
+          await prefs.setString(_profileImagePathKey, clientPath);
+
+          // Clear path from client key to avoid confusion
+          await prefs.remove(_clientProfileImagePathKey);
+
+          print(
+            'OrganizerHomeScreen: Transferred profile image path from client to organizer',
+          );
+        }
+      }
+    } catch (e) {
+      print('OrganizerHomeScreen: Error ensuring organizer key: $e');
     }
   }
 
@@ -778,109 +1071,297 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
 
   Widget _buildEventCountdown(BuildContext context) {
     return Container(
+      height: 200,
       margin: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF9D9DCC), Color(0xFF7575A8)],
-          stops: [0.3, 1.0],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF9D9DCC).withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Stack(
-          children: [
-            // Background image
-            Positioned.fill(
-              child: Opacity(
-                opacity: 0.15,
-                child: Image.asset(
-                  'assets/images/Drawing.png',
-                  fit: BoxFit.cover,
+      child: Stack(
+        children: [
+          // Event container
+          PageView.builder(
+            controller: _eventPageController,
+            itemCount: _events.length,
+            physics:
+                const BouncingScrollPhysics(), // Bouncing effect when reaching edges
+            pageSnapping: true, // Ensures page snaps into place
+            onPageChanged: (index) {
+              setState(() {
+                _currentEventIndex = index;
+              });
+            },
+            itemBuilder: (context, index) {
+              final currentEvent = _events[index];
+              final eventDate = currentEvent['date'] as DateTime;
+              final daysUntil = eventDate.difference(DateTime.now()).inDays;
+              final hoursUntil =
+                  eventDate.difference(DateTime.now()).inHours % 24;
+              final minutesUntil =
+                  eventDate.difference(DateTime.now()).inMinutes % 60;
+              final secondsUntil =
+                  eventDate.difference(DateTime.now()).inSeconds % 60;
+
+              // Calculate animation values for current page
+              final isCurrentPage = index == _currentEventIndex;
+              final isNextPage = index == _currentEventIndex + 1;
+              final isPreviousPage = index == _currentEventIndex - 1;
+
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+                margin: EdgeInsets.only(
+                  right: 8,
+                  left: 8,
+                  top: isCurrentPage ? 0 : 8,
+                  bottom: isCurrentPage ? 0 : 8,
                 ),
-              ),
-            ),
-            // Content
-            Container(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF9D9DCC), Color(0xFF7575A8)],
+                    stops: [0.3, 1.0],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(
+                        0xFF9D9DCC,
+                      ).withOpacity(isCurrentPage ? 0.3 : 0.2),
+                      blurRadius: isCurrentPage ? 10 : 8,
+                      offset:
+                          isCurrentPage
+                              ? const Offset(0, 4)
+                              : const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Stack(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(14),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.event,
-                          color: Colors.white,
-                          size: 24,
+                      // Background image
+                      Positioned.fill(
+                        child: Opacity(
+                          opacity: 0.15,
+                          child: Image.asset(
+                            'assets/images/Drawing.png',
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
+                      // Content
+                      Container(
+                        padding: const EdgeInsets.all(16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Upcoming Event',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(14),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.event,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Upcoming Event',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      Text(
+                                        currentEvent['title'],
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                            const Text(
-                              'Summer Wedding',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
-                              ),
+                            const SizedBox(height: 20),
+                            _buildModernCountdownTimer(
+                              days: daysUntil,
+                              hours: hoursUntil,
+                              minutes: minutesUntil,
+                              seconds: secondsUntil,
                             ),
                           ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  _buildModernCountdownTimer(),
-                ],
+                ),
+              );
+            },
+          ),
+
+          // Left arrow
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            child:
+                _currentEventIndex > 0
+                    ? GestureDetector(
+                      onTap: () {
+                        _eventPageController.previousPage(
+                          duration: const Duration(milliseconds: 500),
+                          curve: Curves.easeOutCubic,
+                        );
+                      },
+                      child: Container(
+                        width: 50,
+                        height: double.infinity,
+                        color: Colors.transparent,
+                        child: Center(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade400.withOpacity(0.3),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 4,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.arrow_back_ios_rounded,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                    : const SizedBox.shrink(),
+          ),
+
+          // Right arrow
+          Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            child:
+                _currentEventIndex < _events.length - 1
+                    ? GestureDetector(
+                      onTap: () {
+                        _eventPageController.nextPage(
+                          duration: const Duration(milliseconds: 500),
+                          curve: Curves.easeOutCubic,
+                        );
+                      },
+                      child: Container(
+                        width: 50,
+                        height: double.infinity,
+                        color: Colors.transparent,
+                        child: Center(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade400.withOpacity(0.3),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 4,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                    : const SizedBox.shrink(),
+          ),
+
+          // Page indicator
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  _events.length,
+                  (index) => GestureDetector(
+                    onTap: () {
+                      _eventPageController.animateToPage(
+                        index,
+                        duration: const Duration(milliseconds: 500),
+                        curve: Curves.easeOutCubic,
+                      );
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: _currentEventIndex == index ? 18 : 8,
+                      height: 8,
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color:
+                            _currentEventIndex == index
+                                ? Colors.white
+                                : Colors.white.withOpacity(0.4),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildModernCountdownTimer() {
+  Widget _buildModernCountdownTimer({
+    required int days,
+    required int hours,
+    required int minutes,
+    required int seconds,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 5),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.1),
+        color: Colors.black.withOpacity(0.18), // Slightly darker background
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
       ),
@@ -906,10 +1387,12 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
-            color: Colors.black.withOpacity(0.15),
+            color: Colors.black.withOpacity(0.3), // Slightly darker background
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withOpacity(
+                  0.18,
+                ), // Slightly stronger shadow
                 blurRadius: 2,
                 offset: const Offset(0, 1),
                 spreadRadius: 0,
@@ -939,12 +1422,14 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
-            color: Colors.white.withOpacity(0.1),
+            color: Colors.black.withOpacity(
+              0.18,
+            ), // Slightly darker background for label
           ),
           child: Text(
             label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
+            style: const TextStyle(
+              color: Colors.white, // Pure white for better visibility
               fontSize: 10,
               fontWeight: FontWeight.w500,
               letterSpacing: 1,
@@ -1114,6 +1599,41 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
     final avatarText =
         displayName.isNotEmpty ? displayName[0].toUpperCase() : 'O';
 
+    print(
+      'OrganizerHomeScreen: _buildDrawer called, profileImage: ${_profileImage != null}, profileImageLoaded: $_profileImageLoaded',
+    );
+
+    // Since we're accessing drawer, verify profile image exists
+    if (_profileImage != null) {
+      String filePath = _profileImage!.path;
+      print(
+        'OrganizerHomeScreen: Double-checking if file exists at: $filePath',
+      );
+      bool fileExists = File(filePath).existsSync();
+      print('OrganizerHomeScreen: File exists check result: $fileExists');
+      if (!fileExists) {
+        print(
+          'OrganizerHomeScreen: Image file does not exist on direct check, forcing reload',
+        );
+        setState(() {
+          _profileImage = null;
+          _profileImageLoaded = false;
+          _profileImagePath = null;
+        });
+        // Immediate reload in a microtask to avoid build phase issues
+        Future.microtask(() => _loadProfileImage());
+      }
+    }
+
+    // Either not loaded yet or file doesn't exist - load it
+    if (!_profileImageLoaded || _profileImage == null) {
+      print(
+        'OrganizerHomeScreen: Profile image not loaded or null, loading now',
+      );
+      // Use Future.microtask to avoid rebuilding during build phase
+      Future.microtask(() => _loadProfileImage());
+    }
+
     return Drawer(
       backgroundColor: Colors.transparent,
       child: SafeArea(
@@ -1151,16 +1671,50 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
                   children: [
                     GestureDetector(
                       onTap: () {
+                        Navigator.pop(context);
                         // Navigate to Account screen and refresh profile image when returning
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder:
-                                (context) => AccountScreen(
-                                  onProfileImageChanged: _loadProfileImage,
-                                ),
-                          ),
-                        );
+                        Future.delayed(Duration(milliseconds: 300), () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) => AccountScreen(
+                                    onProfileImageChanged: () {
+                                      print(
+                                        'OrganizerHomeScreen: onProfileImageChanged callback triggered',
+                                      );
+                                      // Force a full reset of state and rebuild drawer
+                                      if (mounted) {
+                                        setState(() {
+                                          _profileImageLoaded = false;
+                                          _profileImage = null;
+                                          _profileImagePath = null;
+                                        });
+                                        // Force reload image immediately
+                                        _loadProfileImage();
+                                      }
+                                    },
+                                  ),
+                            ),
+                          ).then((_) {
+                            // Also attempt reload when returning from screen
+                            if (mounted) {
+                              setState(() {
+                                _profileImageLoaded = false;
+                                _profileImage = null;
+                                _profileImagePath = null;
+                              });
+                              _loadProfileImage();
+
+                              // Add a delayed reload to ensure we catch any changes
+                              Future.delayed(Duration(milliseconds: 500), () {
+                                if (mounted) {
+                                  _loadProfileImage();
+                                }
+                              });
+                            }
+                          });
+                        });
                       },
                       child: Container(
                         decoration: BoxDecoration(
@@ -1178,11 +1732,28 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
                           radius: 40,
                           backgroundColor: Colors.grey[200],
                           backgroundImage:
-                              _profileImage != null
+                              _profileImage != null &&
+                                      _profileImage!.existsSync()
                                   ? FileImage(_profileImage!)
                                   : null,
+                          onBackgroundImageError:
+                              _profileImage != null &&
+                                      _profileImage!.existsSync()
+                                  ? (exception, stackTrace) {
+                                    print(
+                                      'OrganizerHomeScreen: Error loading profile image: $exception',
+                                    );
+                                    setState(() {
+                                      _profileImage = null;
+                                      _profileImageLoaded = false;
+                                      _profileImagePath = null;
+                                    });
+                                    _loadProfileImage();
+                                  }
+                                  : null,
                           child:
-                              _profileImage == null
+                              _profileImage == null ||
+                                      !_profileImage!.existsSync()
                                   ? Text(
                                     avatarText,
                                     style: const TextStyle(
@@ -1235,15 +1806,77 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
                       title: 'My Account',
                       onTap: () {
                         Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder:
-                                (context) => AccountScreen(
-                                  onProfileImageChanged: _loadProfileImage,
-                                ),
-                          ),
-                        );
+                        // Navigate to Account screen and refresh profile image when returning
+                        Future.delayed(Duration(milliseconds: 300), () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) => AccountScreen(
+                                    onProfileImageChanged: () {
+                                      print(
+                                        'OrganizerHomeScreen: onProfileImageChanged callback triggered',
+                                      );
+                                      // Force a full reset of state and rebuild drawer
+                                      if (mounted) {
+                                        setState(() {
+                                          _profileImageLoaded = false;
+                                          _profileImage = null;
+                                          _profileImagePath = null;
+                                          print(
+                                            'OrganizerHomeScreen: Reset profile image state completely',
+                                          );
+                                        });
+
+                                        // Force reload image immediately to ensure it's updated
+                                        _loadProfileImage();
+
+                                        // And again after a short delay to catch any in-progress changes
+                                        Future.delayed(
+                                          Duration(milliseconds: 500),
+                                          () {
+                                            if (mounted) {
+                                              setState(() {
+                                                _profileImageLoaded = false;
+                                                _profileImage = null;
+                                              });
+                                              _loadProfileImage().then((_) {
+                                                if (mounted) {
+                                                  // Force another rebuild to ensure UI updates
+                                                  setState(() {});
+                                                }
+                                              });
+                                            }
+                                          },
+                                        );
+                                      }
+                                    },
+                                  ),
+                            ),
+                          ).then((_) {
+                            // Also attempt reload when returning from screen
+                            if (mounted) {
+                              setState(() {
+                                _profileImageLoaded = false;
+                                _profileImage = null;
+                                _profileImagePath = null;
+                              });
+                              _loadProfileImage();
+
+                              // Add a delayed reload to ensure we catch any changes that might
+                              // happen after returning to this screen
+                              Future.delayed(Duration(milliseconds: 500), () {
+                                if (mounted) {
+                                  setState(() {
+                                    _profileImageLoaded = false;
+                                    _profileImage = null;
+                                  });
+                                  _loadProfileImage();
+                                }
+                              });
+                            }
+                          });
+                        });
                       },
                     ),
                     // Divider
@@ -1531,6 +2164,15 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
           IconButton(
             icon: const Icon(Icons.menu, color: Colors.white),
             onPressed: () {
+              // Force reload profile image before opening drawer
+              setState(() {
+                _profileImageLoaded = false;
+                _profileImage = null;
+                _profileImagePath = null;
+              });
+              _loadProfileImage();
+
+              // Open the drawer
               _scaffoldKey.currentState?.openDrawer();
             },
           ),
@@ -1949,7 +2591,9 @@ class MenuCardPatternPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return false;
+  }
 }
 
 class PatternPainter extends CustomPainter {

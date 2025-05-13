@@ -1753,11 +1753,13 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
             color: Colors.black.withOpacity(
-              0.25,
+              0.3,
             ), // Darker background for better visibility
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withOpacity(
+                  0.18,
+                ), // Slightly stronger shadow
                 blurRadius: 2,
                 offset: const Offset(0, 1),
                 spreadRadius: 0,
@@ -1787,12 +1789,14 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
-            color: Colors.white.withOpacity(0.1),
+            color: Colors.black.withOpacity(
+              0.18,
+            ), // Slightly darker background for label
           ),
           child: Text(
             label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
+            style: const TextStyle(
+              color: Colors.white, // Pure white for better visibility
               fontSize: 10,
               fontWeight: FontWeight.w500,
               letterSpacing: 1,

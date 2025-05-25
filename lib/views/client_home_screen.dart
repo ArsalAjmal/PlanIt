@@ -22,27 +22,52 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/response_model.dart';
+import '../services/portfolio_service.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter/services.dart';
 
 class ClientHomeScreen extends StatefulWidget {
   const ClientHomeScreen({super.key});
+
+  // Route observer for detecting navigation
+  static final RouteObserver<PageRoute> routeObserver =
+      RouteObserver<PageRoute>();
 
   @override
   State<ClientHomeScreen> createState() => _ClientHomeScreenState();
 }
 
 class _ClientHomeScreenState extends State<ClientHomeScreen>
-    with SingleTickerProviderStateMixin {
-  // Static timer values (to be replaced with Firestore later)
+    with TickerProviderStateMixin, RouteAware {
+  // Timer values for countdown
   int days = 0;
-  int hours = 1;
-  int minutes = 32;
-  int seconds = 6;
-  late Timer _timer;
+  int hours = 0;
+  int minutes = 0;
+  int seconds = 0;
+  Timer? _timer;
   String? _currentCity;
   late Stream<List<ForecastDay>> weatherStream;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
+
+  // Animation controllers
+  late AnimationController _weatherAnimController;
+  late AnimationController _countdownAnimController;
+  late AnimationController _sectionTitleAnimController;
+  late AnimationController _menuAnimController;
+
+  // Animations
+  late Animation<double> _weatherFadeAnim;
+  late Animation<double> _countdownFadeAnim;
+  late Animation<double> _sectionTitleFadeAnim;
+  late Animation<Offset> _sectionTitleSlideAnim;
+
+  // Menu card animations list
+  late List<Animation<double>> _menuCardAnimations;
+
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  bool _isLoadingEvents = true;
 
   // Add this variable for profile image
   final ImagePicker _imagePicker = ImagePicker();
@@ -61,38 +86,18 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
   // Add event management variables
   int _currentEventIndex = 0;
   late PageController _eventPageController;
-  final List<Map<String, dynamic>> _events = [
-    {
-      'title': 'Summer Wedding',
-      'date': DateTime.now().add(
-        const Duration(days: 0, hours: 1, minutes: 32, seconds: 6),
-      ),
-    },
-    {
-      'title': 'Birthday Party',
-      'date': DateTime.now().add(
-        const Duration(days: 3, hours: 5, minutes: 45, seconds: 20),
-      ),
-    },
-    {
-      'title': 'Corporate Event',
-      'date': DateTime.now().add(
-        const Duration(days: 7, hours: 9, minutes: 10, seconds: 30),
-      ),
-    },
-    {
-      'title': 'Family Reunion',
-      'date': DateTime.now().add(
-        const Duration(days: 14, hours: 12, minutes: 0, seconds: 0),
-      ),
-    },
-  ];
+  List<Map<String, dynamic>> _events = [];
+
+  // For rating and event count caching
+  double _portfolioRating = 0.0;
+  int _eventCount = 0;
+  bool _loadingRating = true;
 
   @override
   void initState() {
     super.initState();
     _initializeWeatherStream();
-    startTimer();
+    _loadClientEvents();
     _clearCrossProfileImages(); // Add this to clear any mixed cache
     _loadProfileImage();
     _eventPageController = PageController(
@@ -100,55 +105,341 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
       viewportFraction: 0.95, // Slightly smaller to show a hint of next page
     );
 
-    // Animation setup
-    _animationController = AnimationController(
+    // Create animation controllers directly without disposing first on initial creation
+    _createAnimationControllers();
+    _setupAnimations();
+    _startAnimations();
+  }
+
+  // Create animation controllers
+  void _createAnimationControllers() {
+    // Set up animation controllers with longer durations for smoother animations
+    _weatherAnimController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 1000), // Increased from 600ms
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    _countdownAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200), // Increased from 800ms
     );
 
-    _animationController.forward();
+    _sectionTitleAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000), // Increased from 600ms
+    );
 
-    // Print the current user ID for debugging
-    print('ClientHomeScreen: Current user ID: ${_auth.currentUser?.uid}');
+    _menuAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500), // Increased from 1000ms
+    );
+  }
+
+  // Setup animations with proper curves
+  void _setupAnimations() {
+    // Set up the animations with gentler curves
+    _weatherFadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _weatherAnimController,
+        curve: Curves.easeInOut,
+      ), // Changed from easeOut
+    );
+
+    _countdownFadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _countdownAnimController,
+        curve: Curves.easeInOut,
+      ), // Changed from easeOut
+    );
+
+    _sectionTitleFadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _sectionTitleAnimController,
+        curve: Curves.easeInOut,
+      ), // Changed from easeOut
+    );
+
+    _sectionTitleSlideAnim = Tween<Offset>(
+      begin: const Offset(
+        -0.1,
+        0.0,
+      ), // Reduced offset from -0.2 for subtler slide
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _sectionTitleAnimController,
+        curve: Curves.easeOutQuart,
+      ), // Changed to easeOutQuart for smoother finish
+    );
+
+    // Initialize menu card animations list - will be populated when menu items are known
+    _menuCardAnimations = [];
+  }
+
+  // Extract animation initialization to a separate method
+  void _initializeAnimations() {
+    // Safety dispose the old controllers if they exist
+    _disposeAnimationControllers();
+
+    // Recreate and setup controllers
+    _createAnimationControllers();
+    _setupAnimations();
+
+    // Start the animations
+    _startAnimations();
+  }
+
+  // Extract animation start to a separate method
+  void _startAnimations() {
+    // Reset animations to the beginning
+    _weatherAnimController.reset();
+    _countdownAnimController.reset();
+    _sectionTitleAnimController.reset();
+    _menuAnimController.reset();
+
+    Future.delayed(const Duration(milliseconds: 300), () {
+      // Increased from 100ms
+      if (mounted) _weatherAnimController.forward();
+    });
+
+    Future.delayed(const Duration(milliseconds: 700), () {
+      // Increased from 400ms
+      if (mounted) _countdownAnimController.forward();
+    });
+
+    Future.delayed(const Duration(milliseconds: 1100), () {
+      // Increased from 800ms
+      if (mounted) _sectionTitleAnimController.forward();
+    });
+
+    Future.delayed(const Duration(milliseconds: 1400), () {
+      // Increased from 1000ms
+      if (mounted) _menuAnimController.forward();
+    });
+  }
+
+  // Clean disposal of animation controllers
+  void _disposeAnimationControllers() {
+    try {
+      // Check if the controllers have been initialized
+      if (this.mounted) {
+        // Only dispose if the controller exists and is not already disposed
+        if (_weatherAnimController.isAnimating)
+          _weatherAnimController.dispose();
+        if (_countdownAnimController.isAnimating)
+          _countdownAnimController.dispose();
+        if (_sectionTitleAnimController.isAnimating)
+          _sectionTitleAnimController.dispose();
+        if (_menuAnimController.isAnimating) _menuAnimController.dispose();
+      }
+    } catch (e) {
+      // Controllers might not be initialized yet, which is fine when the widget is first created
+      print('Animation controllers not yet initialized: $e');
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Register with the route observer
+    ClientHomeScreen.routeObserver.subscribe(
+      this,
+      ModalRoute.of(context) as PageRoute,
+    );
   }
 
   @override
   void dispose() {
-    _timer.cancel();
-    _animationController.dispose();
+    if (_timer != null && _timer!.isActive) {
+      _timer!.cancel();
+    }
+
+    // Unsubscribe from route observer
+    ClientHomeScreen.routeObserver.unsubscribe(this);
+
+    // Dispose all animation controllers
+    _disposeAnimationControllers();
+
     _eventPageController.dispose();
     super.dispose();
   }
 
-  void startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        if (seconds > 0) {
-          seconds--;
-        } else {
-          if (minutes > 0) {
-            minutes--;
-            seconds = 59;
-          } else {
-            if (hours > 0) {
-              hours--;
-              minutes = 59;
-              seconds = 59;
-            } else {
-              if (days > 0) {
-                days--;
-                hours = 23;
-                minutes = 59;
-                seconds = 59;
-              } else {
-                timer.cancel();
-              }
-            }
+  // Called when returning to this route
+  @override
+  void didPopNext() {
+    super.didPopNext();
+    print('ClientHomeScreen: Returned to screen, restarting animations');
+    // Restart animations when returning to this screen
+    _startAnimations();
+
+    // Also refresh data
+    _loadClientEvents();
+  }
+
+  // Load client events from Firebase
+  Future<void> _loadClientEvents() async {
+    // Initialize timer values to 0 immediately
+    setState(() {
+      _isLoadingEvents = true;
+      days = 0;
+      hours = 0;
+      minutes = 0;
+      seconds = 0;
+    });
+
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        print('ClientHomeScreen: User not logged in');
+        setState(() {
+          _isLoadingEvents = false;
+        });
+        return;
+      }
+
+      // Fetch responses where the client is the current user
+      final snapshot =
+          await _firestore
+              .collection('responses')
+              .where('clientId', isEqualTo: user.uid)
+              .where('status', whereIn: ['accepted', 'pending'])
+              .orderBy('eventDate')
+              .get();
+
+      final List<Map<String, dynamic>> loadedEvents = [];
+
+      if (snapshot.docs.isNotEmpty) {
+        for (var doc in snapshot.docs) {
+          final responseData = doc.data();
+          final response = ResponseModel.fromMap(responseData);
+
+          // Only include future events
+          if (response.eventDate.isAfter(DateTime.now())) {
+            loadedEvents.add({
+              'title': response.eventName,
+              'date': response.eventDate,
+              'eventType': response.eventType,
+              'id': response.id,
+              'status': response.status,
+            });
           }
+        }
+
+        // Sort events by date (closest first)
+        loadedEvents.sort((a, b) {
+          final DateTime dateA = a['date'] as DateTime;
+          final DateTime dateB = b['date'] as DateTime;
+          return dateA.compareTo(dateB);
+        });
+      }
+
+      // If no events found, add a default placeholder event
+      if (loadedEvents.isEmpty) {
+        loadedEvents.add({
+          'title': 'No upcoming events',
+          'date':
+              DateTime.now(), // Use current time for better placeholder indication
+          'eventType': 'None',
+          'id': 'placeholder',
+          'status': 'none', // Ensure we use consistent status
+        });
+      }
+
+      setState(() {
+        _events = loadedEvents;
+        _isLoadingEvents = false;
+      });
+
+      // Start the timer after loading events
+      startTimer();
+    } catch (e) {
+      print('ClientHomeScreen: Error loading client events: $e');
+      setState(() {
+        _isLoadingEvents = false;
+        // Add a default event in case of error
+        _events = [
+          {
+            'title': 'Error loading events',
+            'date':
+                DateTime.now(), // Use current time for better placeholder indication
+            'eventType': 'None',
+            'id': 'error',
+            'status':
+                'error', // Keep 'error' status to distinguish from normal empty state
+          },
+        ];
+      });
+      startTimer();
+    }
+  }
+
+  void startTimer() {
+    // Cancel any existing timer
+    if (_timer != null && _timer!.isActive) {
+      _timer!.cancel();
+    }
+
+    // Make sure we have events before starting the timer
+    if (_events.isEmpty) {
+      print('ClientHomeScreen: No events to start timer for');
+      setState(() {
+        days = 0;
+        hours = 0;
+        minutes = 0;
+        seconds = 0;
+      });
+      return;
+    }
+
+    // Check if the current event is a placeholder (no real event)
+    final currentEvent = _events[_currentEventIndex];
+    final eventStatus = currentEvent['status'] as String? ?? '';
+    if (eventStatus == 'none' || eventStatus == 'error') {
+      setState(() {
+        days = 0;
+        hours = 0;
+        minutes = 0;
+        seconds = 0;
+      });
+      return;
+    }
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted || _events.isEmpty) {
+        timer.cancel();
+        return;
+      }
+
+      setState(() {
+        // Get the current selected event
+        final currentEvent = _events[_currentEventIndex];
+        final eventDate = currentEvent['date'] as DateTime;
+        final eventStatus = currentEvent['status'] as String? ?? '';
+
+        // If status is none or error, show all zeros
+        if (eventStatus == 'none' || eventStatus == 'error') {
+          days = 0;
+          hours = 0;
+          minutes = 0;
+          seconds = 0;
+          return;
+        }
+
+        // Calculate time difference
+        final difference = eventDate.difference(DateTime.now());
+
+        if (difference.isNegative) {
+          // Event has passed
+          days = 0;
+          hours = 0;
+          minutes = 0;
+          seconds = 0;
+        } else {
+          // Update countdown values
+          days = difference.inDays;
+          hours = difference.inHours % 24;
+          minutes = difference.inMinutes % 60;
+          seconds = difference.inSeconds % 60;
         }
       });
     });
@@ -177,6 +468,31 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
     final screenWidth = MediaQuery.of(context).size.width;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
+    // Initialize menu card animations in build if they weren't created yet
+    if (_menuCardAnimations.isEmpty) {
+      final int itemCount = 4; // Default number of menu items
+      for (int i = 0; i < itemCount; i++) {
+        final startInterval =
+            0.1 * i; // Changed from 0.15 for smoother transition
+        final endInterval = 0.1 * i + 0.9; // Changed to 0.9 for longer fade
+
+        _menuCardAnimations.add(
+          Tween<double>(begin: 0.0, end: 1.0).animate(
+            CurvedAnimation(
+              parent: _menuAnimController,
+              curve: Interval(
+                startInterval,
+                endInterval > 1.0 ? 1.0 : endInterval,
+                curve:
+                    Curves
+                        .easeOutQuart, // Changed from easeOutCubic for smoother motion
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: AppColors.creamBackground,
@@ -192,50 +508,71 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
               children: [
                 _buildAppBar(context),
                 Expanded(
-                  child: FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          _buildCompactWeatherAlert(context),
-                          _buildEventCountdown(context),
-                          const SizedBox(height: 12),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20.0,
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.max,
-                              children: [
-                                Container(
-                                  width: 3,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    color: Colors.black87,
-                                    borderRadius: BorderRadius.circular(1.5),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        // Weather alert with fade-in animation
+                        FadeTransition(
+                          opacity: _weatherFadeAnim,
+                          child: _buildCompactWeatherAlert(context),
+                        ),
+
+                        // Event countdown with fade-in animation
+                        FadeTransition(
+                          opacity: _countdownFadeAnim,
+                          child: _buildEventCountdown(context),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Section title with combined slide and fade animations
+                        FadeTransition(
+                          opacity: _sectionTitleFadeAnim,
+                          child: SlideTransition(
+                            position: _sectionTitleSlideAnim,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20.0,
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.max,
+                                children: [
+                                  Container(
+                                    width: 3,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: Colors.black87,
+                                      borderRadius: BorderRadius.circular(1.5),
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Services',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black87,
-                                    letterSpacing: 0.5,
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Services',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                      letterSpacing: 0.5,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          _buildMenuGrid(context),
-                        ],
-                      ),
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        // Menu grid with animated cards
+                        FadeTransition(
+                          opacity: _menuAnimController,
+                          child: _buildMenuGrid(context),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -724,13 +1061,11 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
             },
           ),
           const Spacer(),
-          const Text(
-            'PlanIt',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+          Image.asset(
+            'assets/images/newlogo3.png',
+            height: 45,
+            width: 160,
+            fit: BoxFit.contain,
           ),
           const Spacer(),
           Stack(
@@ -1438,282 +1773,476 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
     return Container(
       height: 200,
       margin: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-      child: Stack(
-        children: [
-          // Event container
-          PageView.builder(
-            controller: _eventPageController,
-            itemCount: _events.length,
-            physics:
-                const BouncingScrollPhysics(), // Bouncing effect when reaching edges
-            pageSnapping: true, // Ensures page snaps into place
-            onPageChanged: (index) {
-              setState(() {
-                _currentEventIndex = index;
-              });
-            },
-            itemBuilder: (context, index) {
-              final currentEvent = _events[index];
-              final eventDate = currentEvent['date'] as DateTime;
-              final daysUntil = eventDate.difference(DateTime.now()).inDays;
-              final hoursUntil =
-                  eventDate.difference(DateTime.now()).inHours % 24;
-              final minutesUntil =
-                  eventDate.difference(DateTime.now()).inMinutes % 60;
-              final secondsUntil =
-                  eventDate.difference(DateTime.now()).inSeconds % 60;
+      child:
+          _isLoadingEvents
+              ? Center(
+                child: CircularProgressIndicator(color: Color(0xFF9D9DCC)),
+              )
+              : Stack(
+                children: [
+                  // Event container
+                  PageView.builder(
+                    controller: _eventPageController,
+                    itemCount: _events.length,
+                    physics: const BouncingScrollPhysics(),
+                    pageSnapping: true,
+                    onPageChanged: (index) {
+                      setState(() {
+                        _currentEventIndex = index;
 
-              // Calculate animation values for current page
-              final isCurrentPage = index == _currentEventIndex;
-              final isNextPage = index == _currentEventIndex + 1;
-              final isPreviousPage = index == _currentEventIndex - 1;
+                        // Check if the new event is a placeholder and reset timer immediately
+                        final currentEvent = _events[index];
+                        final eventStatus =
+                            currentEvent['status'] as String? ?? '';
 
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOutCubic,
-                margin: EdgeInsets.only(
-                  right: 8,
-                  left: 8,
-                  top: isCurrentPage ? 0 : 8,
-                  bottom: isCurrentPage ? 0 : 8,
-                ),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF9D9DCC), Color(0xFF7575A8)],
-                    stops: [0.3, 1.0],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(
-                        0xFF9D9DCC,
-                      ).withOpacity(isCurrentPage ? 0.3 : 0.2),
-                      blurRadius: isCurrentPage ? 10 : 8,
-                      offset:
-                          isCurrentPage
-                              ? const Offset(0, 4)
-                              : const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: Stack(
-                    children: [
-                      // Background image
-                      Positioned.fill(
-                        child: Opacity(
-                          opacity: 0.15,
-                          child: Image.asset(
-                            'assets/images/Drawing.png',
-                            fit: BoxFit.cover,
-                          ),
+                        // Reset timer values for placeholder events
+                        if (eventStatus == 'none' || eventStatus == 'error') {
+                          days = 0;
+                          hours = 0;
+                          minutes = 0;
+                          seconds = 0;
+                        } else {
+                          // For real events, calculate time immediately
+                          final eventDate = currentEvent['date'] as DateTime;
+                          final difference = eventDate.difference(
+                            DateTime.now(),
+                          );
+
+                          if (difference.isNegative) {
+                            days = 0;
+                            hours = 0;
+                            minutes = 0;
+                            seconds = 0;
+                          } else {
+                            days = difference.inDays;
+                            hours = difference.inHours % 24;
+                            minutes = difference.inMinutes % 60;
+                            seconds = difference.inSeconds % 60;
+                          }
+                        }
+                      });
+                    },
+                    itemBuilder: (context, index) {
+                      final currentEvent = _events[index];
+                      final eventDate = currentEvent['date'] as DateTime;
+
+                      // Calculate time difference
+                      final difference = eventDate.difference(DateTime.now());
+                      final daysUntil =
+                          difference.isNegative ? 0 : difference.inDays;
+                      final hoursUntil =
+                          difference.isNegative ? 0 : difference.inHours % 24;
+                      final minutesUntil =
+                          difference.isNegative ? 0 : difference.inMinutes % 60;
+                      final secondsUntil =
+                          difference.isNegative ? 0 : difference.inSeconds % 60;
+
+                      // Check if timer is at zero
+                      final isTimerZero =
+                          daysUntil == 0 &&
+                          hoursUntil == 0 &&
+                          minutesUntil == 0 &&
+                          secondsUntil == 0;
+
+                      final eventStatus =
+                          currentEvent['status'] as String? ?? '';
+
+                      // Calculate animation values for current page
+                      final isCurrentPage = index == _currentEventIndex;
+
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOutCubic,
+                        margin: EdgeInsets.only(
+                          right: 8,
+                          left: 8,
+                          top: isCurrentPage ? 0 : 8,
+                          bottom: isCurrentPage ? 0 : 8,
                         ),
-                      ),
-                      // Content
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(14),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.1),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Icon(
-                                    Icons.event,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        'Upcoming Event',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      Text(
-                                        currentEvent['title'],
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(24),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: _getEventCardColors(
+                              eventStatus,
+                              isTimerZero: isTimerZero,
                             ),
-                            const SizedBox(height: 20),
-                            _buildModernCountdownTimer(
-                              days: daysUntil,
-                              hours: hoursUntil,
-                              minutes: minutesUntil,
-                              seconds: secondsUntil,
+                            stops: const [0.3, 1.0],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color:
+                                  isTimerZero
+                                      ? Colors.red.withOpacity(
+                                        isCurrentPage ? 0.3 : 0.2,
+                                      )
+                                      : const Color(
+                                        0xFF9D9DCC,
+                                      ).withOpacity(isCurrentPage ? 0.3 : 0.2),
+                              blurRadius: isCurrentPage ? 10 : 8,
+                              offset:
+                                  isCurrentPage
+                                      ? const Offset(0, 4)
+                                      : const Offset(0, 2),
                             ),
                           ],
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-
-          // Left arrow
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            child:
-                _currentEventIndex > 0
-                    ? GestureDetector(
-                      onTap: () {
-                        _eventPageController.previousPage(
-                          duration: const Duration(milliseconds: 500),
-                          curve: Curves.easeOutCubic,
-                        );
-                      },
-                      child: Container(
-                        width: 50,
-                        height: double.infinity,
-                        color: Colors.transparent,
-                        child: Center(
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade400.withOpacity(0.3),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 4,
-                                  spreadRadius: 1,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: Stack(
+                            children: [
+                              // Background image
+                              Positioned.fill(
+                                child: Opacity(
+                                  opacity: 0.15,
+                                  child: Image.asset(
+                                    'assets/images/Drawing.png',
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.arrow_back_ios_rounded,
-                              color: Colors.white,
-                              size: 24,
-                            ),
+                              ),
+
+                              // Close button for expired events
+                              if (isTimerZero &&
+                                  eventStatus != 'none' &&
+                                  eventStatus != 'error')
+                                Positioned(
+                                  top: 8,
+                                  right: 8,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      // Immediately remove from local list for responsive UI
+                                      setState(() {
+                                        // Create a new list without the current event
+                                        _events = List.from(_events)
+                                          ..removeAt(_currentEventIndex);
+
+                                        // If the list is now empty, add a placeholder event
+                                        if (_events.isEmpty) {
+                                          _events.add({
+                                            'title': 'No upcoming events',
+                                            'date': DateTime.now(),
+                                            'eventType': 'None',
+                                            'id': 'placeholder',
+                                            'status': 'none',
+                                          });
+                                        }
+
+                                        // Reset the page controller to avoid index out of range
+                                        _currentEventIndex =
+                                            _currentEventIndex >= _events.length
+                                                ? _events.length - 1
+                                                : _currentEventIndex;
+                                      });
+
+                                      // Also update the database
+                                      if (currentEvent['id'] != null &&
+                                          currentEvent['id'] != 'placeholder' &&
+                                          currentEvent['id'] != 'error') {
+                                        final portfolioService =
+                                            PortfolioService();
+                                        portfolioService
+                                            .markResponseAsCompleted(
+                                              currentEvent['id'],
+                                            )
+                                            .then((_) {
+                                              // Show a confirmation snackbar
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Event marked as complete',
+                                                  ),
+                                                  backgroundColor: Colors.green,
+                                                  duration: Duration(
+                                                    seconds: 2,
+                                                  ),
+                                                ),
+                                              );
+                                            });
+                                      }
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.3),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.close,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                              // Content
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(
+                                              0.2,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(
+                                                  0.1,
+                                                ),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Icon(
+                                            isTimerZero
+                                                ? Icons.access_time_filled
+                                                : Icons.event,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Text(
+                                                    currentEvent['eventType'] ??
+                                                        'Upcoming Event',
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              Text(
+                                                currentEvent['title'],
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                  letterSpacing: 0.5,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    // Remove date display container that's causing overflow
+                                    const SizedBox(height: 12),
+                                    _buildModernCountdownTimer(
+                                      days: daysUntil,
+                                      hours: hoursUntil,
+                                      minutes: minutesUntil,
+                                      seconds: secondsUntil,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                    )
-                    : const SizedBox.shrink(),
-          ),
-
-          // Right arrow
-          Positioned(
-            right: 0,
-            top: 0,
-            bottom: 0,
-            child:
-                _currentEventIndex < _events.length - 1
-                    ? GestureDetector(
-                      onTap: () {
-                        _eventPageController.nextPage(
-                          duration: const Duration(milliseconds: 500),
-                          curve: Curves.easeOutCubic,
-                        );
-                      },
-                      child: Container(
-                        width: 50,
-                        height: double.infinity,
-                        color: Colors.transparent,
-                        child: Center(
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade400.withOpacity(0.3),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 4,
-                                  spreadRadius: 1,
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.arrow_forward_ios_rounded,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                    : const SizedBox.shrink(),
-          ),
-
-          // Page indicator
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  _events.length,
-                  (index) => GestureDetector(
-                    onTap: () {
-                      _eventPageController.animateToPage(
-                        index,
-                        duration: const Duration(milliseconds: 500),
-                        curve: Curves.easeOutCubic,
                       );
                     },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: _currentEventIndex == index ? 18 : 8,
-                      height: 8,
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        color:
-                            _currentEventIndex == index
-                                ? Colors.white
-                                : Colors.white.withOpacity(0.4),
+                  ),
+
+                  // Left arrow
+                  if (_events.length > 1)
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      child:
+                          _currentEventIndex > 0
+                              ? GestureDetector(
+                                onTap: () {
+                                  _eventPageController.previousPage(
+                                    duration: const Duration(milliseconds: 500),
+                                    curve: Curves.easeOutCubic,
+                                  );
+                                },
+                                child: Container(
+                                  width: 50,
+                                  height: double.infinity,
+                                  color: Colors.transparent,
+                                  child: Center(
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade400.withOpacity(
+                                          0.3,
+                                        ),
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(
+                                              0.1,
+                                            ),
+                                            blurRadius: 4,
+                                            spreadRadius: 1,
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Icon(
+                                        Icons.arrow_back_ios_rounded,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                              : const SizedBox.shrink(),
+                    ),
+
+                  // Right arrow
+                  if (_events.length > 1)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      child:
+                          _currentEventIndex < _events.length - 1
+                              ? GestureDetector(
+                                onTap: () {
+                                  _eventPageController.nextPage(
+                                    duration: const Duration(milliseconds: 500),
+                                    curve: Curves.easeOutCubic,
+                                  );
+                                },
+                                child: Container(
+                                  width: 50,
+                                  height: double.infinity,
+                                  color: Colors.transparent,
+                                  child: Center(
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade400.withOpacity(
+                                          0.3,
+                                        ),
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(
+                                              0.1,
+                                            ),
+                                            blurRadius: 4,
+                                            spreadRadius: 1,
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Icon(
+                                        Icons.arrow_forward_ios_rounded,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                              : const SizedBox.shrink(),
+                    ),
+
+                  // Page indicator - only show if multiple events
+                  if (_events.length > 1)
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(
+                            _events.length,
+                            (index) => GestureDetector(
+                              onTap: () {
+                                _eventPageController.animateToPage(
+                                  index,
+                                  duration: const Duration(milliseconds: 500),
+                                  curve: Curves.easeOutCubic,
+                                );
+                              },
+                              child: Container(
+                                width: _currentEventIndex == index ? 18 : 8,
+                                height: 8,
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  color:
+                                      _currentEventIndex == index
+                                          ? Colors.white
+                                          : Colors.white.withOpacity(0.4),
+                                  boxShadow:
+                                      _currentEventIndex == index
+                                          ? [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(
+                                                0.2,
+                                              ),
+                                              blurRadius: 2,
+                                              spreadRadius: 0,
+                                            ),
+                                          ]
+                                          : null,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
+                ],
               ),
-            ),
-          ),
-        ],
-      ),
     );
+  }
+
+  // Helper method to get gradient colors based on event status
+  List<Color> _getEventCardColors(String status, {bool isTimerZero = false}) {
+    // If timer is at 00:00:00:00, return red gradient regardless of status
+    if (isTimerZero) {
+      return [
+        Colors.red.shade400,
+        Colors.red.shade700,
+      ]; // Red gradient for expired events
+    } else if (status.toLowerCase() == 'error') {
+      return [Colors.grey.shade400, Colors.grey.shade600]; // Grey for error
+    } else {
+      return [
+        const Color(0xFF9D9DCC),
+        const Color(0xFF7575A8),
+      ]; // Default purple for all events
+    }
   }
 
   Widget _buildModernCountdownTimer({
@@ -1722,6 +2251,46 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
     required int minutes,
     required int seconds,
   }) {
+    // Check if timer is at zero
+    final bool isTimerZero =
+        days == 0 && hours == 0 && minutes == 0 && seconds == 0;
+
+    // If timer is zero, show a special message instead
+    if (isTimerZero) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 5),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.25),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.red.withOpacity(0.3), width: 1),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.timer_off, color: Colors.white, size: 24),
+            const SizedBox(width: 8),
+            const Text(
+              'EVENT TIME EXPIRED',
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: 'Roboto',
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                letterSpacing: 1.0,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Ensure values are properly formatted with leading zeros
+    final daysStr = days.toString().padLeft(2, '0');
+    final hoursStr = hours.toString().padLeft(2, '0');
+    final minutesStr = minutes.toString().padLeft(2, '0');
+    final secondsStr = seconds.toString().padLeft(2, '0');
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 5),
@@ -1733,13 +2302,13 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildGradientTimeUnit(days.toString().padLeft(2, '0'), 'DAYS'),
+          _buildGradientTimeUnit(daysStr, 'DAYS'),
           _buildTimeSeparator(),
-          _buildGradientTimeUnit(hours.toString().padLeft(2, '0'), 'HRS'),
+          _buildGradientTimeUnit(hoursStr, 'HRS'),
           _buildTimeSeparator(),
-          _buildGradientTimeUnit(minutes.toString().padLeft(2, '0'), 'MIN'),
+          _buildGradientTimeUnit(minutesStr, 'MIN'),
           _buildTimeSeparator(),
-          _buildGradientTimeUnit(seconds.toString().padLeft(2, '0'), 'SEC'),
+          _buildGradientTimeUnit(secondsStr, 'SEC'),
         ],
       ),
     );
@@ -1897,6 +2466,34 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
       },
     ];
 
+    // Initialize card animations if not already created
+    if (_menuCardAnimations.isEmpty && menuItems.isNotEmpty) {
+      for (int i = 0; i < menuItems.length; i++) {
+        // Create staggered animations with different start delays and more overlap
+        final startInterval =
+            0.1 *
+            i; // 0.0, 0.1, 0.2, 0.3 - reduced from 0.15 for smoother transition
+        final endInterval =
+            0.1 * i +
+            0.9; // 0.9, 1.0, 1.1, 1.2 - increased to 0.9 for longer fade
+
+        _menuCardAnimations.add(
+          Tween<double>(begin: 0.0, end: 1.0).animate(
+            CurvedAnimation(
+              parent: _menuAnimController,
+              curve: Interval(
+                startInterval,
+                endInterval > 1.0 ? 1.0 : endInterval,
+                curve:
+                    Curves
+                        .easeOutQuart, // Changed from easeOutCubic for smoother motion
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
       child: GridView.builder(
@@ -1911,13 +2508,41 @@ class _ClientHomeScreenState extends State<ClientHomeScreen>
         itemCount: menuItems.length,
         itemBuilder: (context, index) {
           final item = menuItems[index];
-          return _buildModernMenuCard(
-            context,
-            title: item['title'],
-            icon: item['icon'],
-            color: item['color'],
-            onTap: item['onTap'],
-            index: index,
+
+          // Apply animation to each card with its own controller
+          return AnimatedBuilder(
+            animation:
+                _menuCardAnimations.isNotEmpty
+                    ? _menuCardAnimations[index]
+                    : _menuAnimController,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(
+                  0,
+                  15 *
+                      (1 -
+                          (_menuCardAnimations
+                                  .isNotEmpty // Reduced from 20 for subtler movement
+                              ? _menuCardAnimations[index].value
+                              : _menuAnimController.value)),
+                ),
+                child: Opacity(
+                  opacity:
+                      _menuCardAnimations.isNotEmpty
+                          ? _menuCardAnimations[index].value
+                          : _menuAnimController.value,
+                  child: child,
+                ),
+              );
+            },
+            child: _buildModernMenuCard(
+              context,
+              title: item['title'],
+              icon: item['icon'],
+              color: item['color'],
+              onTap: item['onTap'],
+              index: index,
+            ),
           );
         },
       ),

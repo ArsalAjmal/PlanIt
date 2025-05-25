@@ -20,35 +20,55 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/widgets.dart';
 
 class OrganizerHomeScreen extends StatefulWidget {
   const OrganizerHomeScreen({super.key});
+
+  // Route observer for detecting navigation
+  static final RouteObserver<PageRoute> routeObserver =
+      RouteObserver<PageRoute>();
 
   @override
   State<OrganizerHomeScreen> createState() => _OrganizerHomeScreenState();
 }
 
 class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with TickerProviderStateMixin, WidgetsBindingObserver, RouteAware {
   // Controller for pending orders
   final PendingOrdersController _pendingOrdersController =
       PendingOrdersController();
   bool _isLoading = true;
+  bool _isLoadingEvents = true;
 
   // Add timer values
-  int days = 10;
-  int hours = 12;
-  int minutes = 30;
-  int seconds = 6;
-  late Timer _timer;
+  int days = 0;
+  int hours = 0;
+  int minutes = 0;
+  int seconds = 0;
+  Timer? _timer;
 
   // Add a scaffold key to access the drawer
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Add animation controller
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
+  // Animation controllers for staggered animations
+  late AnimationController _notificationAnimController;
+  late AnimationController _countdownAnimController;
+  late AnimationController _sectionTitleAnimController;
+  late AnimationController _pendingOrdersAnimController;
+  late AnimationController _reviewsTodoAnimController;
+
+  // Animations
+  late Animation<double> _notificationFadeAnim;
+  late Animation<double> _countdownFadeAnim;
+  late Animation<double> _sectionTitleFadeAnim;
+  late Animation<Offset> _sectionTitleSlideAnim;
+  late Animation<double> _pendingOrdersFadeAnim;
+  late Animation<Offset> _pendingOrdersSlideAnim;
+  late Animation<double> _reviewsCardAnim;
+  late Animation<double> _todoCardAnim;
 
   // Add this variable for profile image
   final ImagePicker _imagePicker = ImagePicker();
@@ -61,32 +81,7 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
   // Add event management variables
   int _currentEventIndex = 0;
   late PageController _eventPageController;
-  final List<Map<String, dynamic>> _events = [
-    {
-      'title': 'Summer Wedding',
-      'date': DateTime.now().add(
-        const Duration(days: 10, hours: 12, minutes: 30, seconds: 6),
-      ),
-    },
-    {
-      'title': 'Birthday Party',
-      'date': DateTime.now().add(
-        const Duration(days: 5, hours: 8, minutes: 45, seconds: 30),
-      ),
-    },
-    {
-      'title': 'Corporate Event',
-      'date': DateTime.now().add(
-        const Duration(days: 15, hours: 3, minutes: 20, seconds: 15),
-      ),
-    },
-    {
-      'title': 'Anniversary Celebration',
-      'date': DateTime.now().add(
-        const Duration(days: 2, hours: 14, minutes: 30),
-      ),
-    },
-  ];
+  List<Map<String, dynamic>> _events = [];
 
   @override
   void initState() {
@@ -95,8 +90,8 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
     WidgetsBinding.instance.addObserver(this);
 
     _loadPendingOrders();
+    _loadOrganizerEvents();
     _debugCheckAllResponses();
-    startTimer();
     _clearCrossProfileImages();
     _loadProfileImage();
     _eventPageController = PageController(
@@ -104,26 +99,201 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
       viewportFraction: 0.95, // Slightly smaller to show a hint of next page
     );
 
-    // Animation setup
-    _animationController = AnimationController(
+    // Create animation controllers directly without disposing first on initial creation
+    _createAnimationControllers();
+    _setupAnimations();
+    _startAnimations();
+  }
+
+  // Create animation controllers
+  void _createAnimationControllers() {
+    // Set up animation controllers with longer durations for smoother animations
+    _notificationAnimController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 1000),
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    _countdownAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
     );
 
-    _animationController.forward();
+    _sectionTitleAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+
+    _pendingOrdersAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+
+    _reviewsTodoAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+  }
+
+  // Setup animations with proper curves
+  void _setupAnimations() {
+    // Set up the animations with gentler curves
+    _notificationFadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _notificationAnimController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    _countdownFadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _countdownAnimController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    _sectionTitleFadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _sectionTitleAnimController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    _sectionTitleSlideAnim = Tween<Offset>(
+      begin: const Offset(-0.1, 0.0), // Subtler slide
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _sectionTitleAnimController,
+        curve: Curves.easeOutQuart,
+      ),
+    );
+
+    _pendingOrdersFadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _pendingOrdersAnimController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    _pendingOrdersSlideAnim = Tween<Offset>(
+      begin: const Offset(0.0, 0.08), // Subtle slide up
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _pendingOrdersAnimController,
+        curve: Curves.easeOutQuart,
+      ),
+    );
+
+    // Reviews card animation - fade in and scale
+    _reviewsCardAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _reviewsTodoAnimController,
+        curve: const Interval(0.0, 0.7, curve: Curves.easeOutQuart),
+      ),
+    );
+
+    // Todo card animation - fade in and scale with delay
+    _todoCardAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _reviewsTodoAnimController,
+        curve: const Interval(0.3, 1.0, curve: Curves.easeOutQuart),
+      ),
+    );
+  }
+
+  // Extract animation initialization to a separate method
+  void _initializeAnimations() {
+    // Safety dispose the old controllers if they exist
+    _disposeAnimationControllers();
+
+    // Recreate and setup controllers
+    _createAnimationControllers();
+    _setupAnimations();
+
+    // Start the animations
+    _startAnimations();
+  }
+
+  // Extract animation start to a separate method
+  void _startAnimations() {
+    // Reset animations to the beginning
+    _notificationAnimController.reset();
+    _countdownAnimController.reset();
+    _sectionTitleAnimController.reset();
+    _pendingOrdersAnimController.reset();
+    _reviewsTodoAnimController.reset();
+
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) _notificationAnimController.forward();
+    });
+
+    Future.delayed(const Duration(milliseconds: 700), () {
+      if (mounted) _countdownAnimController.forward();
+    });
+
+    Future.delayed(const Duration(milliseconds: 1100), () {
+      if (mounted) _sectionTitleAnimController.forward();
+    });
+
+    Future.delayed(const Duration(milliseconds: 1400), () {
+      if (mounted) _pendingOrdersAnimController.forward();
+    });
+
+    Future.delayed(const Duration(milliseconds: 1700), () {
+      if (mounted) _reviewsTodoAnimController.forward();
+    });
+  }
+
+  // Clean disposal of animation controllers
+  void _disposeAnimationControllers() {
+    try {
+      // Check if the controllers have been initialized
+      if (this.mounted) {
+        // Only dispose if the controller exists and is not already disposed
+        if (_notificationAnimController.isAnimating)
+          _notificationAnimController.dispose();
+        if (_countdownAnimController.isAnimating)
+          _countdownAnimController.dispose();
+        if (_sectionTitleAnimController.isAnimating)
+          _sectionTitleAnimController.dispose();
+        if (_pendingOrdersAnimController.isAnimating)
+          _pendingOrdersAnimController.dispose();
+        if (_reviewsTodoAnimController.isAnimating)
+          _reviewsTodoAnimController.dispose();
+      }
+    } catch (e) {
+      // Controllers might not be initialized yet, which is fine when the widget is first created
+      print('Animation controllers not yet initialized: $e');
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Register with the route observer
+    OrganizerHomeScreen.routeObserver.subscribe(
+      this,
+      ModalRoute.of(context) as PageRoute,
+    );
   }
 
   @override
   void dispose() {
-    _timer.cancel();
-    _animationController.dispose();
-    _eventPageController.dispose();
-    // Remove observer
+    if (_timer != null && _timer!.isActive) {
+      _timer!.cancel();
+    }
+
+    // Unsubscribe from route observer
+    OrganizerHomeScreen.routeObserver.unsubscribe(this);
+
+    // Unregister from lifecycle changes
     WidgetsBinding.instance.removeObserver(this);
+
+    // Dispose animation controllers
+    _disposeAnimationControllers();
+
+    _eventPageController.dispose();
     super.dispose();
   }
 
@@ -139,33 +309,246 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
         _profileImagePath = null;
       });
       _loadProfileImage();
+
+      // Restart animations when app comes back to foreground
+      _startAnimations();
+    }
+  }
+
+  // Called when returning to this route
+  @override
+  void didPopNext() {
+    super.didPopNext();
+    print('OrganizerHomeScreen: Returned to screen, restarting animations');
+    // Restart animations when returning to this screen
+    _startAnimations();
+  }
+
+  // Load organizer events from Firebase
+  Future<void> _loadOrganizerEvents() async {
+    print('OrganizerHomeScreen: Starting to load events...');
+
+    // Initialize timer values to 0 immediately
+    setState(() {
+      _isLoadingEvents = true;
+      days = 0;
+      hours = 0;
+      minutes = 0;
+      seconds = 0;
+    });
+
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        print('OrganizerHomeScreen: User not logged in');
+        setState(() {
+          _isLoadingEvents = false;
+        });
+        return;
+      }
+
+      print(
+        'OrganizerHomeScreen: Loading events for organizer ID: ${user.uid}',
+      );
+
+      // Fetch responses where the organizer is the current user
+      final snapshot =
+          await _firestore
+              .collection('responses')
+              .where('organizerId', isEqualTo: user.uid)
+              // Include both accepted and pending events with no status filter
+              .orderBy('eventDate')
+              .get();
+
+      print(
+        'OrganizerHomeScreen: Found ${snapshot.docs.length} total responses',
+      );
+
+      final List<Map<String, dynamic>> loadedEvents = [];
+
+      // Debug: Compare the user.uid with the organizer IDs in the responses
+      print('OrganizerHomeScreen: Current user (organizer) ID: ${user.uid}');
+
+      // Print all responses for debugging
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        print(
+          'OrganizerHomeScreen: Response ID: ${doc.id}, Status: ${data['status']}, Organizer ID: ${data['organizerId']}',
+        );
+      }
+
+      if (snapshot.docs.isNotEmpty) {
+        for (var doc in snapshot.docs) {
+          final responseData = doc.data();
+          final eventDate = DateTime.parse(responseData['eventDate']);
+          final status =
+              (responseData['status'] as String? ?? '').toLowerCase();
+
+          // Only include future events with accepted or pending status
+          // Explicitly exclude events with 'completed' status
+          if (eventDate.isAfter(DateTime.now()) &&
+              (status == 'accepted' || status == 'pending') &&
+              status != 'completed') {
+            loadedEvents.add({
+              'title': responseData['eventName'],
+              'date': eventDate,
+              'eventType': responseData['eventType'],
+              'id': responseData['id'],
+              'status': status,
+            });
+          }
+        }
+
+        // Sort events by date (closest first)
+        loadedEvents.sort((a, b) {
+          final DateTime dateA = a['date'] as DateTime;
+          final DateTime dateB = b['date'] as DateTime;
+          return dateA.compareTo(dateB);
+        });
+      }
+
+      // If no events found, add a default placeholder event
+      if (loadedEvents.isEmpty) {
+        print(
+          'OrganizerHomeScreen: No future events found, adding placeholder',
+        );
+        loadedEvents.add({
+          'title': 'No upcoming events',
+          'date':
+              DateTime.now(), // Use current time for better placeholder indication
+          'eventType': 'None',
+          'id': 'placeholder',
+          'status': 'none', // Ensure we use consistent status
+        });
+      }
+
+      setState(() {
+        _events = loadedEvents;
+        _isLoadingEvents = false;
+      });
+
+      // Start the timer after loading events
+      startTimer();
+    } catch (e) {
+      print('OrganizerHomeScreen: Error loading events: $e');
+      setState(() {
+        _isLoadingEvents = false;
+        // Add a default event in case of error
+        _events = [
+          {
+            'title': 'Error loading events',
+            'date':
+                DateTime.now(), // Use current time for better placeholder indication
+            'eventType': 'None',
+            'id': 'error',
+            'status':
+                'error', // Keep 'error' status to distinguish from normal empty state
+          },
+        ];
+      });
+      startTimer();
     }
   }
 
   void startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    // Cancel any existing timer
+    if (_timer != null && _timer!.isActive) {
+      _timer!.cancel();
+    }
+
+    // Make sure we have events before starting the timer
+    if (_events.isEmpty) {
+      print('OrganizerHomeScreen: No events to start timer for');
       setState(() {
-        if (seconds > 0) {
-          seconds--;
+        days = 0;
+        hours = 0;
+        minutes = 0;
+        seconds = 0;
+      });
+      return;
+    }
+
+    // Check if the current event is a placeholder (no real event)
+    final currentEvent = _events[_currentEventIndex];
+    final eventStatus = currentEvent['status'] as String? ?? '';
+    if (eventStatus == 'none' || eventStatus == 'error') {
+      setState(() {
+        days = 0;
+        hours = 0;
+        minutes = 0;
+        seconds = 0;
+      });
+      return;
+    }
+
+    // For real events, calculate time immediately before starting the timer
+    final eventDate = currentEvent['date'] as DateTime;
+    final initialDifference = eventDate.difference(DateTime.now());
+
+    // Debug the initial time calculation
+    print('OrganizerHomeScreen: Initial time calculation:');
+    print('- Event date: $eventDate');
+    print('- Current time: ${DateTime.now()}');
+    print('- Total hours: ${initialDifference.inHours}');
+    print('- Days: ${initialDifference.inDays}');
+    print('- Hours after days: ${initialDifference.inHours % 24}');
+
+    if (!initialDifference.isNegative) {
+      setState(() {
+        days = initialDifference.inDays;
+        hours = initialDifference.inHours % 24;
+        minutes = initialDifference.inMinutes % 60;
+        seconds = initialDifference.inSeconds % 60;
+
+        // Debug log the values we're setting
+        print(
+          'OrganizerHomeScreen: Setting timer values - Days: $days, Hours: $hours, Minutes: $minutes, Seconds: $seconds',
+        );
+      });
+    }
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted || _events.isEmpty) {
+        timer.cancel();
+        return;
+      }
+
+      setState(() {
+        // Get the current selected event
+        final currentEvent = _events[_currentEventIndex];
+        final eventDate = currentEvent['date'] as DateTime;
+        final eventStatus = currentEvent['status'] as String? ?? '';
+
+        // If status is none or error, show all zeros
+        if (eventStatus == 'none' || eventStatus == 'error') {
+          days = 0;
+          hours = 0;
+          minutes = 0;
+          seconds = 0;
+          return;
+        }
+
+        // Calculate time difference
+        final difference = eventDate.difference(DateTime.now());
+
+        if (difference.isNegative) {
+          // Event has passed
+          days = 0;
+          hours = 0;
+          minutes = 0;
+          seconds = 0;
         } else {
-          if (minutes > 0) {
-            minutes--;
-            seconds = 59;
-          } else {
-            if (hours > 0) {
-              hours--;
-              minutes = 59;
-              seconds = 59;
-            } else {
-              if (days > 0) {
-                days--;
-                hours = 23;
-                minutes = 59;
-                seconds = 59;
-              } else {
-                timer.cancel();
-              }
-            }
+          // Update countdown values
+          days = difference.inDays;
+          hours = difference.inHours % 24;
+          minutes = difference.inMinutes % 60;
+          seconds = difference.inSeconds % 60;
+
+          // Add debug logging every minute to check the hours calculation
+          if (seconds == 0) {
+            print(
+              'OrganizerHomeScreen: Timer update - Days: $days, Hours: $hours, Minutes: $minutes, Seconds: $seconds',
+            );
           }
         }
       });
@@ -173,6 +556,7 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
   }
 
   Future<void> _loadPendingOrders() async {
+    print('OrganizerHomeScreen: Starting to load pending orders...');
     setState(() {
       _isLoading = true;
     });
@@ -181,10 +565,40 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
     final user = _auth.currentUser;
 
     if (user != null) {
+      print('OrganizerHomeScreen: Current user ID: ${user.uid}');
+
+      // First do a direct check of the responses collection to verify data
+      try {
+        final snapshot = await _firestore.collection('responses').get();
+
+        print('Total responses in database: ${snapshot.docs.length}');
+
+        // Print all responses to see what's available
+        print('======= RESPONSE CHECK =======');
+        for (var doc in snapshot.docs) {
+          final data = doc.data();
+          print('Response: ${doc.id}');
+          print('- Status: ${data['status']}');
+          print('- Organizer ID: ${data['organizerId']}');
+          print('- Client ID: ${data['clientId']}');
+          print('- Event Name: ${data['eventName']}');
+          print('- Created At: ${data['createdAt']}');
+          print('-----------------------------------');
+        }
+        print('======= END RESPONSE CHECK =======');
+      } catch (e) {
+        print('Error in direct database check: $e');
+      }
+
       // Initialize the stream first for real-time updates
       _pendingOrdersController.initPendingOrdersStream(user.uid);
       // Then fetch orders to populate the initial list
       await _pendingOrdersController.fetchPendingOrders(user.uid);
+
+      // Check how many orders were loaded
+      print(
+        'OrganizerHomeScreen: Loaded ${_pendingOrdersController.pendingOrders.length} pending orders',
+      );
     } else {
       print('Cannot fetch orders: User is not logged in');
     }
@@ -601,73 +1015,107 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
                     physics: const BouncingScrollPhysics(),
                     child: Column(
                       children: [
-                        FadeTransition(
-                          opacity: _fadeAnimation,
-                          child: Column(
-                            children: [
-                              // Notification
-                              _buildCompactCollaborationNotification(context),
+                        Column(
+                          children: [
+                            // Notification with fade-in animation
+                            FadeTransition(
+                              opacity: _notificationFadeAnim,
+                              child: _buildCompactCollaborationNotification(
+                                context,
+                              ),
+                            ),
 
-                              // Countdown
-                              _buildEventCountdown(context),
+                            // Countdown with fade-in animation
+                            FadeTransition(
+                              opacity: _countdownFadeAnim,
+                              child: _buildEventCountdown(context),
+                            ),
 
-                              // Services header
-                              const SizedBox(height: 12),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 20.0,
+                            // Services header with combined slide and fade animations
+                            FadeTransition(
+                              opacity: _sectionTitleFadeAnim,
+                              child: SlideTransition(
+                                position: _sectionTitleSlideAnim,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20.0,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 3,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          color: Colors.black87,
+                                          borderRadius: BorderRadius.circular(
+                                            1.5,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        'Services',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black87,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // The cards with staggered animations
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                              ),
+                              child: Container(
+                                // Use fixed height based on screen size for menu cards
+                                height: screenHeight * 0.45,
                                 child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
                                   children: [
-                                    Container(
-                                      width: 3,
-                                      height: 24,
-                                      decoration: BoxDecoration(
-                                        color: Colors.black87,
-                                        borderRadius: BorderRadius.circular(
-                                          1.5,
+                                    // Left side - Large Pending Orders card
+                                    Expanded(
+                                      flex: 3,
+                                      child: FadeTransition(
+                                        opacity: _pendingOrdersFadeAnim,
+                                        child: SlideTransition(
+                                          position: _pendingOrdersSlideAnim,
+                                          child: _buildPendingOrdersCard(),
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    const Text(
-                                      'Services',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black87,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-
-                              // The cards
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16.0,
-                                ),
-                                child: Container(
-                                  // Use fixed height based on screen size for menu cards
-                                  height: screenHeight * 0.45,
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      // Left side - Large Pending Orders card
-                                      Expanded(
-                                        flex: 3,
-                                        child: _buildPendingOrdersCard(),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      // Right side - Two smaller cards
-                                      Expanded(
-                                        flex: 2,
-                                        child: Column(
-                                          children: [
-                                            Expanded(
+                                    const SizedBox(width: 12),
+                                    // Right side - Two smaller cards with staggered animation
+                                    Expanded(
+                                      flex: 2,
+                                      child: Column(
+                                        children: [
+                                          // Reviews card
+                                          Expanded(
+                                            child: AnimatedBuilder(
+                                              animation: _reviewsCardAnim,
+                                              builder: (context, child) {
+                                                return Opacity(
+                                                  opacity:
+                                                      _reviewsCardAnim.value,
+                                                  child: Transform.scale(
+                                                    scale:
+                                                        0.95 +
+                                                        (_reviewsCardAnim
+                                                                .value *
+                                                            0.05),
+                                                    child: child,
+                                                  ),
+                                                );
+                                              },
                                               child: _buildModernMenuCard(
                                                 context,
                                                 title: 'Reviews',
@@ -686,8 +1134,24 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
                                                 index: 0,
                                               ),
                                             ),
-                                            const SizedBox(height: 12),
-                                            Expanded(
+                                          ),
+                                          const SizedBox(height: 12),
+                                          // Todo card with delayed animation
+                                          Expanded(
+                                            child: AnimatedBuilder(
+                                              animation: _todoCardAnim,
+                                              builder: (context, child) {
+                                                return Opacity(
+                                                  opacity: _todoCardAnim.value,
+                                                  child: Transform.scale(
+                                                    scale:
+                                                        0.95 +
+                                                        (_todoCardAnim.value *
+                                                            0.05),
+                                                    child: child,
+                                                  ),
+                                                );
+                                              },
                                               child: _buildModernMenuCard(
                                                 context,
                                                 title: 'Todo List',
@@ -706,18 +1170,18 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
                                                 index: 1,
                                               ),
                                             ),
-                                          ],
-                                        ),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
+                            ),
 
-                              // Extra bottom padding
-                              const SizedBox(height: 20),
-                            ],
-                          ),
+                            // Extra bottom padding
+                            const SizedBox(height: 20),
+                          ],
                         ),
                       ],
                     ),
@@ -744,6 +1208,7 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
           ).then((result) {
             if (result == 'ORDER_COMPLETED') {
               _loadPendingOrders();
+              _loadOrganizerEvents(); // Also reload events when an order is completed
             }
           });
         } else {
@@ -1073,281 +1538,467 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
     return Container(
       height: 200,
       margin: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-      child: Stack(
-        children: [
-          // Event container
-          PageView.builder(
-            controller: _eventPageController,
-            itemCount: _events.length,
-            physics:
-                const BouncingScrollPhysics(), // Bouncing effect when reaching edges
-            pageSnapping: true, // Ensures page snaps into place
-            onPageChanged: (index) {
-              setState(() {
-                _currentEventIndex = index;
-              });
-            },
-            itemBuilder: (context, index) {
-              final currentEvent = _events[index];
-              final eventDate = currentEvent['date'] as DateTime;
-              final daysUntil = eventDate.difference(DateTime.now()).inDays;
-              final hoursUntil =
-                  eventDate.difference(DateTime.now()).inHours % 24;
-              final minutesUntil =
-                  eventDate.difference(DateTime.now()).inMinutes % 60;
-              final secondsUntil =
-                  eventDate.difference(DateTime.now()).inSeconds % 60;
+      child:
+          _isLoadingEvents
+              ? Center(
+                child: CircularProgressIndicator(color: Color(0xFF9D9DCC)),
+              )
+              : Stack(
+                children: [
+                  // Event container
+                  PageView.builder(
+                    controller: _eventPageController,
+                    itemCount: _events.length,
+                    physics: const BouncingScrollPhysics(),
+                    pageSnapping: true,
+                    onPageChanged: (index) {
+                      setState(() {
+                        _currentEventIndex = index;
 
-              // Calculate animation values for current page
-              final isCurrentPage = index == _currentEventIndex;
-              final isNextPage = index == _currentEventIndex + 1;
-              final isPreviousPage = index == _currentEventIndex - 1;
+                        // Check if the new event is a placeholder and reset timer immediately
+                        final currentEvent = _events[index];
+                        final eventStatus =
+                            currentEvent['status'] as String? ?? '';
 
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOutCubic,
-                margin: EdgeInsets.only(
-                  right: 8,
-                  left: 8,
-                  top: isCurrentPage ? 0 : 8,
-                  bottom: isCurrentPage ? 0 : 8,
-                ),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF9D9DCC), Color(0xFF7575A8)],
-                    stops: [0.3, 1.0],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(
-                        0xFF9D9DCC,
-                      ).withOpacity(isCurrentPage ? 0.3 : 0.2),
-                      blurRadius: isCurrentPage ? 10 : 8,
-                      offset:
-                          isCurrentPage
-                              ? const Offset(0, 4)
-                              : const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: Stack(
-                    children: [
-                      // Background image
-                      Positioned.fill(
-                        child: Opacity(
-                          opacity: 0.15,
-                          child: Image.asset(
-                            'assets/images/Drawing.png',
-                            fit: BoxFit.cover,
-                          ),
+                        // Reset timer values for placeholder events
+                        if (eventStatus == 'none' || eventStatus == 'error') {
+                          days = 0;
+                          hours = 0;
+                          minutes = 0;
+                          seconds = 0;
+                        } else {
+                          // For real events, calculate time immediately
+                          final eventDate = currentEvent['date'] as DateTime;
+                          final difference = eventDate.difference(
+                            DateTime.now(),
+                          );
+
+                          // Debug logs for tracking hours calculation
+                          print(
+                            'OrganizerHomeScreen: onPageChanged time calculation:',
+                          );
+                          print('- Event date: $eventDate');
+                          print('- Current time: ${DateTime.now()}');
+                          print('- Total hours: ${difference.inHours}');
+                          print('- Days: ${difference.inDays}');
+                          print(
+                            '- Hours after days: ${difference.inHours % 24}',
+                          );
+
+                          if (difference.isNegative) {
+                            days = 0;
+                            hours = 0;
+                            minutes = 0;
+                            seconds = 0;
+                          } else {
+                            days = difference.inDays;
+                            hours = difference.inHours % 24;
+                            minutes = difference.inMinutes % 60;
+                            seconds = difference.inSeconds % 60;
+
+                            // Final verification of the values
+                            print(
+                              'OrganizerHomeScreen: Setting timer in onPageChanged - Days: $days, Hours: $hours, Minutes: $minutes, Seconds: $seconds',
+                            );
+                          }
+                        }
+                      });
+                    },
+                    itemBuilder: (context, index) {
+                      final currentEvent = _events[index];
+                      final eventDate = currentEvent['date'] as DateTime;
+
+                      // Calculate time difference
+                      final difference = eventDate.difference(DateTime.now());
+                      final daysUntil =
+                          difference.isNegative ? 0 : difference.inDays;
+                      final hoursUntil =
+                          difference.isNegative ? 0 : difference.inHours % 24;
+                      final minutesUntil =
+                          difference.isNegative ? 0 : difference.inMinutes % 60;
+                      final secondsUntil =
+                          difference.isNegative ? 0 : difference.inSeconds % 60;
+
+                      // Check if timer is at zero
+                      final isTimerZero =
+                          daysUntil == 0 &&
+                          hoursUntil == 0 &&
+                          minutesUntil == 0 &&
+                          secondsUntil == 0;
+
+                      final eventStatus =
+                          currentEvent['status'] as String? ?? 'pending';
+
+                      // Calculate animation values for current page
+                      final isCurrentPage = index == _currentEventIndex;
+
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOutCubic,
+                        margin: EdgeInsets.only(
+                          right: 8,
+                          left: 8,
+                          top: isCurrentPage ? 0 : 8,
+                          bottom: isCurrentPage ? 0 : 8,
                         ),
-                      ),
-                      // Content
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(14),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.1),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Icon(
-                                    Icons.event,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        'Upcoming Event',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      Text(
-                                        currentEvent['title'],
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(24),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: _getEventCardColors(
+                              eventStatus,
+                              isTimerZero: isTimerZero,
                             ),
-                            const SizedBox(height: 20),
-                            _buildModernCountdownTimer(
-                              days: daysUntil,
-                              hours: hoursUntil,
-                              minutes: minutesUntil,
-                              seconds: secondsUntil,
+                            stops: const [0.3, 1.0],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color:
+                                  isTimerZero
+                                      ? Colors.red.withOpacity(
+                                        isCurrentPage ? 0.3 : 0.2,
+                                      )
+                                      : const Color(
+                                        0xFF9D9DCC,
+                                      ).withOpacity(isCurrentPage ? 0.3 : 0.2),
+                              blurRadius: isCurrentPage ? 10 : 8,
+                              offset:
+                                  isCurrentPage
+                                      ? const Offset(0, 4)
+                                      : const Offset(0, 2),
                             ),
                           ],
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-
-          // Left arrow
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            child:
-                _currentEventIndex > 0
-                    ? GestureDetector(
-                      onTap: () {
-                        _eventPageController.previousPage(
-                          duration: const Duration(milliseconds: 500),
-                          curve: Curves.easeOutCubic,
-                        );
-                      },
-                      child: Container(
-                        width: 50,
-                        height: double.infinity,
-                        color: Colors.transparent,
-                        child: Center(
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade400.withOpacity(0.3),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 4,
-                                  spreadRadius: 1,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: Stack(
+                            children: [
+                              // Background image
+                              Positioned.fill(
+                                child: Opacity(
+                                  opacity: 0.15,
+                                  child: Image.asset(
+                                    'assets/images/Drawing.png',
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.arrow_back_ios_rounded,
-                              color: Colors.white,
-                              size: 24,
-                            ),
+                              ),
+
+                              // Close button for expired events
+                              if (isTimerZero &&
+                                  eventStatus != 'none' &&
+                                  eventStatus != 'error')
+                                Positioned(
+                                  top: 8,
+                                  right: 8,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      // Immediately remove from local list for responsive UI
+                                      setState(() {
+                                        // Create a new list without the current event
+                                        _events = List.from(_events)
+                                          ..removeAt(_currentEventIndex);
+
+                                        // If the list is now empty, add a placeholder event
+                                        if (_events.isEmpty) {
+                                          _events.add({
+                                            'title': 'No upcoming events',
+                                            'date': DateTime.now(),
+                                            'eventType': 'None',
+                                            'id': 'placeholder',
+                                            'status': 'none',
+                                          });
+                                        }
+
+                                        // Reset the page controller to avoid index out of range
+                                        _currentEventIndex =
+                                            _currentEventIndex >= _events.length
+                                                ? _events.length - 1
+                                                : _currentEventIndex;
+                                      });
+
+                                      // Also update the database
+                                      if (currentEvent['id'] != null &&
+                                          currentEvent['id'] != 'placeholder' &&
+                                          currentEvent['id'] != 'error') {
+                                        final portfolioService =
+                                            PortfolioService();
+                                        portfolioService
+                                            .markResponseAsCompleted(
+                                              currentEvent['id'],
+                                            )
+                                            .then((_) {
+                                              // Show a confirmation snackbar
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Event marked as complete',
+                                                  ),
+                                                  backgroundColor: Colors.green,
+                                                  duration: Duration(
+                                                    seconds: 2,
+                                                  ),
+                                                ),
+                                              );
+                                            });
+                                      }
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.3),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.close,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                              // Content
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(
+                                              0.2,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(
+                                                  0.1,
+                                                ),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Icon(
+                                            isTimerZero
+                                                ? Icons.access_time_filled
+                                                : Icons.event,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                currentEvent['eventType'] ??
+                                                    'Upcoming Event',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                              Text(
+                                                currentEvent['title'],
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                  letterSpacing: 0.5,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    _buildModernCountdownTimer(
+                                      days: daysUntil,
+                                      hours: hoursUntil,
+                                      minutes: minutesUntil,
+                                      seconds: secondsUntil,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                    )
-                    : const SizedBox.shrink(),
-          ),
-
-          // Right arrow
-          Positioned(
-            right: 0,
-            top: 0,
-            bottom: 0,
-            child:
-                _currentEventIndex < _events.length - 1
-                    ? GestureDetector(
-                      onTap: () {
-                        _eventPageController.nextPage(
-                          duration: const Duration(milliseconds: 500),
-                          curve: Curves.easeOutCubic,
-                        );
-                      },
-                      child: Container(
-                        width: 50,
-                        height: double.infinity,
-                        color: Colors.transparent,
-                        child: Center(
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade400.withOpacity(0.3),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 4,
-                                  spreadRadius: 1,
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.arrow_forward_ios_rounded,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                    : const SizedBox.shrink(),
-          ),
-
-          // Page indicator
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  _events.length,
-                  (index) => GestureDetector(
-                    onTap: () {
-                      _eventPageController.animateToPage(
-                        index,
-                        duration: const Duration(milliseconds: 500),
-                        curve: Curves.easeOutCubic,
                       );
                     },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: _currentEventIndex == index ? 18 : 8,
-                      height: 8,
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        color:
-                            _currentEventIndex == index
-                                ? Colors.white
-                                : Colors.white.withOpacity(0.4),
+                  ),
+
+                  // Left arrow
+                  if (_events.length > 1)
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      child:
+                          _currentEventIndex > 0
+                              ? GestureDetector(
+                                onTap: () {
+                                  _eventPageController.previousPage(
+                                    duration: const Duration(milliseconds: 500),
+                                    curve: Curves.easeOutCubic,
+                                  );
+                                },
+                                child: Container(
+                                  width: 50,
+                                  height: double.infinity,
+                                  color: Colors.transparent,
+                                  child: Center(
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade400.withOpacity(
+                                          0.3,
+                                        ),
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(
+                                              0.1,
+                                            ),
+                                            blurRadius: 4,
+                                            spreadRadius: 1,
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Icon(
+                                        Icons.arrow_back_ios_rounded,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                              : const SizedBox.shrink(),
+                    ),
+
+                  // Right arrow
+                  if (_events.length > 1)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      child:
+                          _currentEventIndex < _events.length - 1
+                              ? GestureDetector(
+                                onTap: () {
+                                  _eventPageController.nextPage(
+                                    duration: const Duration(milliseconds: 500),
+                                    curve: Curves.easeOutCubic,
+                                  );
+                                },
+                                child: Container(
+                                  width: 50,
+                                  height: double.infinity,
+                                  color: Colors.transparent,
+                                  child: Center(
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade400.withOpacity(
+                                          0.3,
+                                        ),
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(
+                                              0.1,
+                                            ),
+                                            blurRadius: 4,
+                                            spreadRadius: 1,
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Icon(
+                                        Icons.arrow_forward_ios_rounded,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                              : const SizedBox.shrink(),
+                    ),
+
+                  // Page indicator - only show if multiple events
+                  if (_events.length > 1)
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(
+                            _events.length,
+                            (index) => GestureDetector(
+                              onTap: () {
+                                _eventPageController.animateToPage(
+                                  index,
+                                  duration: const Duration(milliseconds: 500),
+                                  curve: Curves.easeOutCubic,
+                                );
+                              },
+                              child: Container(
+                                width: _currentEventIndex == index ? 18 : 8,
+                                height: 8,
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  color:
+                                      _currentEventIndex == index
+                                          ? Colors.white
+                                          : Colors.white.withOpacity(0.4),
+                                  boxShadow:
+                                      _currentEventIndex == index
+                                          ? [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(
+                                                0.2,
+                                              ),
+                                              blurRadius: 2,
+                                              spreadRadius: 0,
+                                            ),
+                                          ]
+                                          : null,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
+                ],
               ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -1357,6 +2008,47 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
     required int minutes,
     required int seconds,
   }) {
+    // Check if timer is at zero
+    final bool isTimerZero =
+        days == 0 && hours == 0 && minutes == 0 && seconds == 0;
+
+    // If timer is zero, show a special message instead
+    if (isTimerZero) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 5),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.25),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.red.withOpacity(0.3), width: 1),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.timer_off, color: Colors.white, size: 24),
+            const SizedBox(width: 8),
+            const Text(
+              'EVENT TIME EXPIRED',
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: 'Roboto',
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                letterSpacing: 1.0,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // For non-zero timers, show the regular countdown display
+    // Ensure values are properly formatted with leading zeros
+    final daysStr = days.toString().padLeft(2, '0');
+    final hoursStr = hours.toString().padLeft(2, '0');
+    final minutesStr = minutes.toString().padLeft(2, '0');
+    final secondsStr = seconds.toString().padLeft(2, '0');
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 5),
@@ -1368,13 +2060,13 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildGradientTimeUnit(days.toString().padLeft(2, '0'), 'DAYS'),
+          _buildGradientTimeUnit(daysStr, 'DAYS'),
           _buildTimeSeparator(),
-          _buildGradientTimeUnit(hours.toString().padLeft(2, '0'), 'HRS'),
+          _buildGradientTimeUnit(hoursStr, 'HRS'),
           _buildTimeSeparator(),
-          _buildGradientTimeUnit(minutes.toString().padLeft(2, '0'), 'MIN'),
+          _buildGradientTimeUnit(minutesStr, 'MIN'),
           _buildTimeSeparator(),
-          _buildGradientTimeUnit(seconds.toString().padLeft(2, '0'), 'SEC'),
+          _buildGradientTimeUnit(secondsStr, 'SEC'),
         ],
       ),
     );
@@ -1387,12 +2079,10 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
-            color: Colors.black.withOpacity(0.3), // Slightly darker background
+            color: Colors.black.withOpacity(0.3), // Darker background
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(
-                  0.18,
-                ), // Slightly stronger shadow
+                color: Colors.black.withOpacity(0.18), // Stronger shadow
                 blurRadius: 2,
                 offset: const Offset(0, 1),
                 spreadRadius: 0,
@@ -1424,7 +2114,7 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
             borderRadius: BorderRadius.circular(10),
             color: Colors.black.withOpacity(
               0.18,
-            ), // Slightly darker background for label
+            ), // Darker background for label
           ),
           child: Text(
             label,
@@ -1462,133 +2152,6 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildModernMenuCard(
-    BuildContext context, {
-    required String title,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-    int index = 0,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.12),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-              spreadRadius: 0,
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(
-            children: [
-              // Background gradient overlay
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Colors.white, color.withOpacity(0.03)],
-                    ),
-                  ),
-                ),
-              ),
-
-              // Pattern overlay
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: MenuCardPatternPainter(color: color),
-                ),
-              ),
-
-              // Content
-              Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [color, const Color(0xFF7575A8)],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: color.withOpacity(0.25),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Icon(icon, color: Colors.white, size: 26),
-                    ),
-                    const Spacer(),
-
-                    // Clear, non-faded title text
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.black87,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 17,
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // Progress indicator
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            height: 4,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                                colors: [color, color.withOpacity(0.3)],
-                              ),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: color.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.arrow_forward_ios,
-                            color: color,
-                            size: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -1672,48 +2235,51 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
                     GestureDetector(
                       onTap: () {
                         Navigator.pop(context);
-                        // Navigate to Account screen and refresh profile image when returning
-                        Future.delayed(Duration(milliseconds: 300), () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (context) => AccountScreen(
-                                    onProfileImageChanged: () {
-                                      print(
-                                        'OrganizerHomeScreen: onProfileImageChanged callback triggered',
-                                      );
-                                      // Force a full reset of state and rebuild drawer
-                                      if (mounted) {
-                                        setState(() {
-                                          _profileImageLoaded = false;
-                                          _profileImage = null;
-                                          _profileImagePath = null;
-                                        });
-                                        // Force reload image immediately
-                                        _loadProfileImage();
-                                      }
-                                    },
-                                  ),
-                            ),
-                          ).then((_) {
-                            // Also attempt reload when returning from screen
-                            if (mounted) {
-                              setState(() {
-                                _profileImageLoaded = false;
-                                _profileImage = null;
-                                _profileImagePath = null;
-                              });
-                              _loadProfileImage();
+                        // Navigate to Account screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) => AccountScreen(
+                                  onProfileImageChanged: () {
+                                    // Force a complete reload by resetting state
+                                    setState(() {
+                                      _profileImageLoaded = false;
+                                      _profileImage = null;
+                                      _profileImagePath = null;
+                                    });
+                                    // Explicitly reload the profile image and update state
+                                    _loadProfileImage();
 
-                              // Add a delayed reload to ensure we catch any changes
-                              Future.delayed(Duration(milliseconds: 500), () {
-                                if (mounted) {
-                                  _loadProfileImage();
-                                }
-                              });
-                            }
-                          });
+                                    // Add a delayed check to ensure all updates are processed
+                                    Future.delayed(
+                                      Duration(milliseconds: 500),
+                                      () {
+                                        if (mounted) {
+                                          _loadProfileImage();
+                                        }
+                                      },
+                                    );
+                                  },
+                                ),
+                          ),
+                        ).then((_) {
+                          // Also attempt reload when returning from screen
+                          if (mounted) {
+                            setState(() {
+                              _profileImageLoaded = false;
+                              _profileImage = null;
+                              _profileImagePath = null;
+                            });
+                            _loadProfileImage();
+
+                            // Add a delayed reload to ensure we catch any changes
+                            Future.delayed(Duration(milliseconds: 500), () {
+                              if (mounted) {
+                                _loadProfileImage();
+                              }
+                            });
+                          }
                         });
                       },
                       child: Container(
@@ -1806,76 +2372,51 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
                       title: 'My Account',
                       onTap: () {
                         Navigator.pop(context);
-                        // Navigate to Account screen and refresh profile image when returning
-                        Future.delayed(Duration(milliseconds: 300), () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (context) => AccountScreen(
-                                    onProfileImageChanged: () {
-                                      print(
-                                        'OrganizerHomeScreen: onProfileImageChanged callback triggered',
-                                      );
-                                      // Force a full reset of state and rebuild drawer
-                                      if (mounted) {
-                                        setState(() {
-                                          _profileImageLoaded = false;
-                                          _profileImage = null;
-                                          _profileImagePath = null;
-                                          print(
-                                            'OrganizerHomeScreen: Reset profile image state completely',
-                                          );
-                                        });
+                        // Navigate to Account screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) => AccountScreen(
+                                  onProfileImageChanged: () {
+                                    // Force a complete reload by resetting state
+                                    setState(() {
+                                      _profileImageLoaded = false;
+                                      _profileImage = null;
+                                      _profileImagePath = null;
+                                    });
+                                    // Explicitly reload the profile image and update state
+                                    _loadProfileImage();
 
-                                        // Force reload image immediately to ensure it's updated
-                                        _loadProfileImage();
+                                    // Add a delayed check to ensure all updates are processed
+                                    Future.delayed(
+                                      Duration(milliseconds: 500),
+                                      () {
+                                        if (mounted) {
+                                          _loadProfileImage();
+                                        }
+                                      },
+                                    );
+                                  },
+                                ),
+                          ),
+                        ).then((_) {
+                          // Also attempt reload when returning from screen
+                          if (mounted) {
+                            setState(() {
+                              _profileImageLoaded = false;
+                              _profileImage = null;
+                              _profileImagePath = null;
+                            });
+                            _loadProfileImage();
 
-                                        // And again after a short delay to catch any in-progress changes
-                                        Future.delayed(
-                                          Duration(milliseconds: 500),
-                                          () {
-                                            if (mounted) {
-                                              setState(() {
-                                                _profileImageLoaded = false;
-                                                _profileImage = null;
-                                              });
-                                              _loadProfileImage().then((_) {
-                                                if (mounted) {
-                                                  // Force another rebuild to ensure UI updates
-                                                  setState(() {});
-                                                }
-                                              });
-                                            }
-                                          },
-                                        );
-                                      }
-                                    },
-                                  ),
-                            ),
-                          ).then((_) {
-                            // Also attempt reload when returning from screen
-                            if (mounted) {
-                              setState(() {
-                                _profileImageLoaded = false;
-                                _profileImage = null;
-                                _profileImagePath = null;
-                              });
-                              _loadProfileImage();
-
-                              // Add a delayed reload to ensure we catch any changes that might
-                              // happen after returning to this screen
-                              Future.delayed(Duration(milliseconds: 500), () {
-                                if (mounted) {
-                                  setState(() {
-                                    _profileImageLoaded = false;
-                                    _profileImage = null;
-                                  });
-                                  _loadProfileImage();
-                                }
-                              });
-                            }
-                          });
+                            // Add a delayed reload to ensure we catch any changes
+                            Future.delayed(Duration(milliseconds: 500), () {
+                              if (mounted) {
+                                _loadProfileImage();
+                              }
+                            });
+                          }
                         });
                       },
                     ),
@@ -2110,6 +2651,7 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
                         ],
                       ),
                     ),
+                    // Removed the large SizedBox to reduce blank space
                   ],
                 ),
               ),
@@ -2164,42 +2706,28 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
           IconButton(
             icon: const Icon(Icons.menu, color: Colors.white),
             onPressed: () {
-              // Force reload profile image before opening drawer
-              setState(() {
-                _profileImageLoaded = false;
-                _profileImage = null;
-                _profileImagePath = null;
-              });
-              _loadProfileImage();
-
-              // Open the drawer
               _scaffoldKey.currentState?.openDrawer();
             },
           ),
           const Spacer(),
-          const Text(
-            'PlanIt',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+          Image.asset(
+            'assets/images/newlogo3.png',
+            height: 45,
+            width: 160,
+            fit: BoxFit.contain,
           ),
           const Spacer(),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(25),
-            ),
-            child: IconButton(
-              icon: const Icon(
-                Icons.notifications_outlined,
-                color: Colors.white,
-              ),
-              onPressed: () {
-                // Show notification panel
-              },
-            ),
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+            onPressed: () {
+              // TODO: Implement notifications panel
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Notifications coming soon'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -2532,6 +3060,153 @@ class _OrganizerHomeScreenState extends State<OrganizerHomeScreen>
               child: const Icon(Icons.person, color: Colors.white, size: 16),
             ),
         ],
+      ),
+    );
+  }
+
+  // Helper method to get gradient colors based on event status
+  List<Color> _getEventCardColors(String status, {bool isTimerZero = false}) {
+    // If timer is at 00:00:00:00, return red gradient regardless of status
+    if (isTimerZero) {
+      return [
+        Colors.red.shade400,
+        Colors.red.shade700,
+      ]; // Red gradient for expired events
+    } else if (status.toLowerCase() == 'error') {
+      return [Colors.grey.shade400, Colors.grey.shade600]; // Grey for error
+    } else {
+      return [
+        const Color(0xFF9D9DCC),
+        const Color(0xFF7575A8),
+      ]; // Default purple for all events
+    }
+  }
+
+  Widget _buildModernMenuCard(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    required int index,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.12),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+              spreadRadius: 0,
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
+            children: [
+              // Background gradient overlay
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Colors.white, color.withOpacity(0.03)],
+                    ),
+                  ),
+                ),
+              ),
+
+              // Pattern overlay
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: MenuCardPatternPainter(color: color),
+                ),
+              ),
+
+              // Content
+              Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [color, color.withOpacity(0.8)],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: color.withOpacity(0.25),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Icon(icon, color: Colors.white, size: 26),
+                    ),
+                    const Spacer(),
+
+                    // Clear, non-faded title text
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: Colors.black87,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Progress indicator
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            height: 4,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                                colors: [color, color.withOpacity(0.3)],
+                              ),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 40),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Arrow indicator without animation
+              Positioned(
+                bottom: 20,
+                right: 16,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.arrow_forward_ios, color: color, size: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -18,19 +18,34 @@ class PendingOrdersController extends ChangeNotifier {
   void initPendingOrdersStream(String organizerId) {
     print('Initializing pending orders stream for organizer: $organizerId');
 
+    // Print organizer ID for debugging
+    print('Searching for orders with organizerId: $organizerId');
+
     // First check if there are any pending orders directly with a one-time query
     _firestore
         .collection('responses')
         .where('organizerId', isEqualTo: organizerId)
-        .where('status', whereIn: ['pending', 'Pending', 'PENDING'])
         .get()
         .then((snapshot) {
-          print('Initial check found ${snapshot.docs.length} pending orders');
+          print(
+            'Found ${snapshot.docs.length} total responses for this organizer',
+          );
+
+          // Debug: Print all responses for this organizer regardless of status
           for (var doc in snapshot.docs) {
             print(
-              'Order: ${doc.id}, status: ${doc.data()['status']}, organizer: ${doc.data()['organizerId']}',
+              'Response: ${doc.id}, status: ${doc.data()['status']}, organizer: ${doc.data()['organizerId']}, client: ${doc.data()['clientId']}, event: ${doc.data()['eventName']}, date: ${doc.data()['eventDate']}',
             );
           }
+
+          // Now specifically check pending orders - case insensitive check
+          final pendingDocs =
+              snapshot.docs.where((doc) {
+                final status = doc.data()['status'] as String? ?? '';
+                return status.toLowerCase() == 'pending';
+              }).toList();
+
+          print('Found ${pendingDocs.length} pending orders specifically');
         })
         .catchError((error) {
           print('Error in initial orders check: $error');
@@ -39,14 +54,30 @@ class PendingOrdersController extends ChangeNotifier {
     _pendingOrdersStream = _firestore
         .collection('responses')
         .where('organizerId', isEqualTo: organizerId)
-        .where('status', whereIn: ['pending', 'Pending', 'PENDING'])
+        // Re-add the status filter but with all possible case variations
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
+          // Print all responses first
+          print('Stream found ${snapshot.docs.length} total responses');
+          for (var doc in snapshot.docs) {
+            print(
+              'Stream response: ${doc.id}, status: ${doc.data()['status']}, organizer: ${doc.data()['organizerId']}, event: ${doc.data()['eventName']}',
+            );
+          }
+
+          // Filter for pending with case-insensitive check
+          final pendingDocs =
+              snapshot.docs.where((doc) {
+                final status = doc.data()['status'] as String? ?? '';
+                return status.toLowerCase() == 'pending';
+              }).toList();
+
           final orders =
-              snapshot.docs
+              pendingDocs
                   .map((doc) => ResponseModel.fromMap(doc.data()))
                   .toList();
+
           print(
             'Stream found ${orders.length} pending orders for organizer $organizerId',
           );
@@ -81,14 +112,28 @@ class PendingOrdersController extends ChangeNotifier {
           await _firestore
               .collection('responses')
               .where('organizerId', isEqualTo: organizerId)
-              .where('status', whereIn: ['pending', 'Pending', 'PENDING'])
+              // Re-add the status filter but with all possible case variations
               .orderBy('createdAt', descending: true)
               .get();
 
+      print('Fetch query found ${snapshot.docs.length} total responses');
+      for (var doc in snapshot.docs) {
+        print(
+          'Response in fetch: ${doc.id}, status: ${doc.data()['status']}, organizer: ${doc.data()['organizerId']}, event: ${doc.data()['eventName']}',
+        );
+      }
+
+      // Filter for pending with case-insensitive check
+      final pendingDocs =
+          snapshot.docs.where((doc) {
+            final status = doc.data()['status'] as String? ?? '';
+            return status.toLowerCase() == 'pending';
+          }).toList();
+
+      print('After filtering, found ${pendingDocs.length} pending responses');
+
       final responses =
-          snapshot.docs
-              .map((doc) => ResponseModel.fromMap(doc.data()))
-              .toList();
+          pendingDocs.map((doc) => ResponseModel.fromMap(doc.data())).toList();
 
       _pendingOrders.addAll(responses);
       print(

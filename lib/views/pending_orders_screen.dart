@@ -515,9 +515,6 @@ class _PendingOrdersScreenState extends State<PendingOrdersScreen>
               _buildInfoRow(Icons.location_city, 'City', _order!.city),
               const SizedBox(height: 12),
 
-              _buildInfoRow(Icons.phone, 'Phone', _order!.phoneNumber),
-              const SizedBox(height: 12),
-
               _buildInfoRow(
                 Icons.notes,
                 'Notes',

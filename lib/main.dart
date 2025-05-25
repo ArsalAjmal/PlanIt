@@ -12,6 +12,9 @@ import 'views/order_history_screen.dart';
 import 'views/client/portfolio_debug_screen.dart';
 import 'providers/city_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'views/client_home_screen.dart';
+import 'views/organizer_home_screen.dart';
+import 'views/account_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,6 +57,12 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'PlanIt',
         debugShowCheckedModeBanner: false,
+        // Register route observers for animation restarting
+        navigatorObservers: [
+          ClientHomeScreen.routeObserver,
+          OrganizerHomeScreen.routeObserver,
+          AccountScreen.routeObserver,
+        ],
         theme: ThemeData(
           primarySwatch: Colors.amber,
           fontFamily: 'Roboto',

@@ -9,6 +9,7 @@ import '../../constants/app_colors.dart';
 import '../../models/response_model.dart';
 import '../../services/portfolio_service.dart';
 import 'package:uuid/uuid.dart';
+import 'payment_success_screen.dart';
 
 // Add the PaymentConfirmationScreen class
 class PaymentConfirmationScreen extends StatelessWidget {
@@ -210,7 +211,7 @@ class OrderSummaryScreen extends StatefulWidget {
     required this.address,
     required this.apartment,
     required this.city,
-    required this.phoneNumber,
+    this.phoneNumber = '',
   }) : super(key: key);
 
   @override
@@ -288,21 +289,11 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
   }
 
   void _navigateToConfirmationScreen() {
-    Navigator.of(context).push(
+    Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
-        builder:
-            (context) => PaymentConfirmationScreen(
-              onBackToHome: () {
-                // Navigate to client home screen
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(
-                    builder: (context) => const ClientHomeScreen(),
-                  ),
-                  (route) => false,
-                );
-              },
-            ),
+        builder: (context) => PaymentSuccessScreen(eventName: widget.eventName),
       ),
+      (route) => false,
     );
   }
 
@@ -338,6 +329,16 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
           city: widget.city,
           phoneNumber: widget.phoneNumber,
         );
+
+        // Print detailed debugging information
+        print('===== CREATING NEW RESPONSE IN ORDER SUMMARY =====');
+        print('Response ID: ${response.id}');
+        print('Portfolio ID: ${response.portfolioId}');
+        print('Organizer ID: ${response.organizerId}');
+        print('Client ID: ${response.clientId}');
+        print('Status: ${response.status}');
+        print('Event Date: ${response.eventDate}');
+        print('=================================================');
 
         // Try to create response in Firestore
         // If there's an issue, we'll still show success to the user

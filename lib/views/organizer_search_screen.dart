@@ -45,10 +45,15 @@ class OrganizerSearchView extends StatefulWidget {
   State<OrganizerSearchView> createState() => _OrganizerSearchViewState();
 }
 
-class _OrganizerSearchViewState extends State<OrganizerSearchView> {
+class _OrganizerSearchViewState extends State<OrganizerSearchView>
+    with TickerProviderStateMixin {
   // Timer for promotional offers
   Timer? _promotionalTimer;
   int _remainingSeconds = 15 * 60; // 15 minutes in seconds
+  bool _showTimerBanner = false; // Flag to control timer visibility
+
+  // Animation controller for slide-in effect
+  late AnimationController _slideController;
 
   // Cache for ratings and event counts
   final Map<String, double> _portfolioRatings = {};
@@ -58,8 +63,27 @@ class _OrganizerSearchViewState extends State<OrganizerSearchView> {
   @override
   void initState() {
     super.initState();
+
+    // Initialize the slide controller
+    _slideController = AnimationController(
+      vsync: this,
+      duration: const Duration(
+        milliseconds: 1200,
+      ), // Longer duration for slower animation
+    );
+
     // Start the promotional timer
     _startPromoTimer();
+
+    // Add longer delay to show the timer banner with animation
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() {
+          _showTimerBanner = true;
+          _slideController.forward();
+        });
+      }
+    });
   }
 
   @override
@@ -76,6 +100,7 @@ class _OrganizerSearchViewState extends State<OrganizerSearchView> {
   @override
   void dispose() {
     _promotionalTimer?.cancel();
+    _slideController.dispose();
     final controller = Provider.of<OrganizerSearchController>(
       context,
       listen: false,
@@ -242,230 +267,276 @@ class _OrganizerSearchViewState extends State<OrganizerSearchView> {
       ),
     );
 
-    return Scaffold(
-      backgroundColor: AppColors.creamBackground,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: const BoxDecoration(
-                color: Color(0xFF9D9DCC),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    offset: Offset(0, 2),
-                    blurRadius: 4,
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: AppColors.creamBackground,
+          // Add bottom sheet for timer banner with animation - fully removes when closed
+          bottomSheet: _showTimerBanner ? _buildTimerBottomSheet() : null,
+          resizeToAvoidBottomInset: true,
+          // Remove persistent footer buttons completely
+          body: SafeArea(
+            child: Column(
+              children: [
+                // App bar - fixed at top, won't scroll
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
                   ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const Text(
-                    'Search',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                ],
-              ),
-            ),
-            _buildSearchBar(context),
-            _buildPromotionalOffers(),
-            Consumer<OrganizerSearchController>(
-              builder: (context, controller, child) {
-                if (controller.isLoading) {
-                  return const Expanded(
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF9D9DCC),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF9D9DCC),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black12,
+                        offset: Offset(0, 2),
+                        blurRadius: 4,
                       ),
-                    ),
-                  );
-                }
-
-                final hasPortfolios = controller.portfolios.isNotEmpty;
-                final hasOrganizers = controller.organizers.isNotEmpty;
-                final hasResults = hasPortfolios || hasOrganizers;
-                final hasSearchQuery = controller.hasSearchQuery;
-
-                if (!hasResults && hasSearchQuery) {
-                  return Expanded(
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.search_off,
-                              size: 64,
-                              color: Color(0xFF9D9DCC),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No results found for "${controller.searchQuery}"',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: Colors.black87,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Try different keywords or filters',
-                              style: TextStyle(
-                                color: Colors.black87,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      const Text(
+                        'Search',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ),
-                  );
-                }
+                      const Spacer(),
+                    ],
+                  ),
+                ),
 
-                // Use a builder for better performance with lists
-                return Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    // Calculate the total item count with headers
-                    itemCount:
-                        (hasPortfolios ? 1 + controller.portfolios.length : 0) +
-                        (hasOrganizers ? 1 + controller.organizers.length : 0) +
-                        (!hasResults && !hasSearchQuery ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      // Portfolio section
-                      if (hasPortfolios) {
-                        if (index == 0) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8.0),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 3,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    color: Colors.black87,
-                                    borderRadius: BorderRadius.circular(1.5),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'Portfolios',
-                                  style: TextStyle(
-                                    color: Colors.black87,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
+                // Search bar - also fixed
+                Container(color: Colors.white, child: _buildSearchBar(context)),
 
-                        if (index < 1 + controller.portfolios.length) {
-                          return _buildPortfolioCard(
-                            context,
-                            controller.portfolios[index - 1],
-                          );
-                        }
-
-                        // If we have both sections, add spacing after portfolios
-                        if (hasOrganizers &&
-                            index == 1 + controller.portfolios.length) {
-                          return const SizedBox(height: 24);
-                        }
-                      }
-
-                      // Organizer section - adjust index based on portfolio section
-                      final organizerStartIndex =
-                          hasPortfolios
-                              ? 1 +
-                                  controller.portfolios.length +
-                                  (hasOrganizers ? 1 : 0)
-                              : 0;
-
-                      if (hasOrganizers) {
-                        if (index == organizerStartIndex) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8.0),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 3,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    color: Colors.black87,
-                                    borderRadius: BorderRadius.circular(1.5),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'Organizers',
-                                  style: TextStyle(
-                                    color: Colors.black87,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-
-                        if (index > organizerStartIndex &&
-                            index <
-                                organizerStartIndex +
-                                    1 +
-                                    controller.organizers.length) {
-                          return _buildOrganizerCard(
-                            context,
-                            controller.organizers[index -
-                                organizerStartIndex -
-                                1],
-                          );
-                        }
-                      }
-
-                      // Empty results message
-                      if (!hasResults && !hasSearchQuery) {
+                // Scrollable content
+                Expanded(
+                  child: Consumer<OrganizerSearchController>(
+                    builder: (context, controller, child) {
+                      if (controller.isLoading) {
                         return const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF9D9DCC),
+                          ),
+                        );
+                      }
+
+                      final hasPortfolios = controller.portfolios.isNotEmpty;
+                      final hasOrganizers = controller.organizers.isNotEmpty;
+                      final hasResults = hasPortfolios || hasOrganizers;
+                      final hasSearchQuery = controller.hasSearchQuery;
+
+                      if (!hasResults && hasSearchQuery) {
+                        return Center(
                           child: Padding(
-                            padding: EdgeInsets.symmetric(
-                              vertical: 32.0,
+                            padding: const EdgeInsets.symmetric(
                               horizontal: 24.0,
                             ),
-                            child: Text(
-                              'Search for organizers and portfolios',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.black87,
-                                fontSize: 16,
-                              ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.search_off,
+                                  size: 64,
+                                  color: Color(0xFF9D9DCC),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No results found for "${controller.searchQuery}"',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.black87,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Try different keywords or filters',
+                                  style: TextStyle(
+                                    color: Colors.black87,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         );
                       }
 
-                      return const SizedBox.shrink();
+                      // Scrollable content - promotional offers and results
+                      return CustomScrollView(
+                        slivers: [
+                          // Promotional offers (now scrollable)
+                          SliverToBoxAdapter(child: _buildPromotionalOffers()),
+
+                          // Portfolio section header
+                          if (hasPortfolios)
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  16,
+                                  16,
+                                  8,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 3,
+                                      height: 24,
+                                      decoration: BoxDecoration(
+                                        color: Colors.black87,
+                                        borderRadius: BorderRadius.circular(
+                                          1.5,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      'Portfolios',
+                                      style: TextStyle(
+                                        color: Colors.black87,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                          // Portfolio items
+                          if (hasPortfolios)
+                            SliverList(
+                              delegate: SliverChildBuilderDelegate((
+                                context,
+                                index,
+                              ) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
+                                  child: _buildPortfolioCard(
+                                    context,
+                                    controller.portfolios[index],
+                                  ),
+                                );
+                              }, childCount: controller.portfolios.length),
+                            ),
+
+                          // Spacing between sections
+                          if (hasPortfolios && hasOrganizers)
+                            const SliverToBoxAdapter(
+                              child: SizedBox(height: 24),
+                            ),
+
+                          // Organizer section header
+                          if (hasOrganizers)
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  8,
+                                  16,
+                                  8,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 3,
+                                      height: 24,
+                                      decoration: BoxDecoration(
+                                        color: Colors.black87,
+                                        borderRadius: BorderRadius.circular(
+                                          1.5,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      'Organizers',
+                                      style: TextStyle(
+                                        color: Colors.black87,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                          // Organizer items
+                          if (hasOrganizers)
+                            SliverList(
+                              delegate: SliverChildBuilderDelegate((
+                                context,
+                                index,
+                              ) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
+                                  child: _buildOrganizerCard(
+                                    context,
+                                    controller.organizers[index],
+                                  ),
+                                );
+                              }, childCount: controller.organizers.length),
+                            ),
+
+                          // Empty state message
+                          if (!hasResults && !hasSearchQuery)
+                            SliverFillRemaining(
+                              child: const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: 32.0,
+                                    horizontal: 24.0,
+                                  ),
+                                  child: Text(
+                                    'Search for organizers and portfolios',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.black87,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                          // Add bottom padding to account for timer banner only when shown
+                          SliverToBoxAdapter(
+                            child: SizedBox(height: _showTimerBanner ? 80 : 20),
+                          ),
+                        ],
+                      );
                     },
                   ),
-                );
-              },
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+
+        // Add overlay at the bottom to cover the line
+        if (!_showTimerBanner)
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(height: 1, color: AppColors.creamBackground),
+          ),
+      ],
     );
   }
 
@@ -964,99 +1035,170 @@ class _OrganizerSearchViewState extends State<OrganizerSearchView> {
     );
   }
 
+  // New method to build the timer bottom sheet
+  Widget _buildTimerBottomSheet() {
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: const Offset(0, 1), // Start from bottom
+        end: Offset.zero,
+      ).animate(
+        CurvedAnimation(
+          parent: _slideController,
+          curve: Curves.easeOutCubic, // Smoother curve for gentler animation
+        ),
+      ),
+      child: AnimatedContainer(
+        duration: const Duration(
+          milliseconds: 1200,
+        ), // Match slide animation duration
+        curve: Curves.easeInOut,
+        height: 70,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF1F1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.2),
+              spreadRadius: 1,
+              blurRadius: 4,
+              offset: const Offset(0, -2),
+            ),
+          ],
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(16),
+            topRight: Radius.circular(16),
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Close button
+            Positioned(
+              top: 8,
+              right: 8,
+              child: GestureDetector(
+                onTap: () {
+                  // Animate out before removing
+                  _slideController.reverse().then((_) {
+                    if (mounted) {
+                      setState(() {
+                        _showTimerBanner = false;
+                      });
+
+                      // Force a layout rebuild after state change
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) setState(() {});
+                      });
+                    }
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close, size: 16, color: Colors.pink),
+                ),
+              ),
+            ),
+
+            // Timer content - shifted to the left
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                16,
+                12,
+                60,
+                12,
+              ), // Extra right padding to avoid overlapping with close button
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Clock icon
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.2),
+                          spreadRadius: 1,
+                          blurRadius: 2,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Image.asset(
+                      'assets/images/clock_icon.png',
+                      width: 24,
+                      height: 24,
+                      errorBuilder:
+                          (context, error, stackTrace) => const Icon(
+                            Icons.timer,
+                            color: Colors.pink,
+                            size: 24,
+                          ),
+                    ),
+                  ),
+
+                  // Text content
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Save 25%',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.pink,
+                          ),
+                        ),
+                        Text(
+                          'Hurry! Limited time offers',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Timer display
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.pink,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _formatTime(_remainingSeconds),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildPromotionalOffers() {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Promotional timer banner
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFF1F1), // Light pink background
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
-                spreadRadius: 1,
-                blurRadius: 2,
-                offset: const Offset(0, 1),
-              ),
-            ],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Clock icon
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.2),
-                      spreadRadius: 1,
-                      blurRadius: 2,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: Image.asset(
-                  'assets/images/clock_icon.png',
-                  width: 24,
-                  height: 24,
-                  errorBuilder:
-                      (context, error, stackTrace) =>
-                          const Icon(Icons.timer, color: Colors.pink, size: 24),
-                ),
-              ),
-
-              // Text content
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Save 25%',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.pink,
-                      ),
-                    ),
-                    Text(
-                      'Hurry! Limited time offers',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Timer display
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.pink,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  _formatTime(_remainingSeconds),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-
         // Horizontal promotional cards
         SizedBox(
           height: 180,
@@ -1307,5 +1449,32 @@ class _OrganizerSearchViewState extends State<OrganizerSearchView> {
         ),
       ),
     );
+  }
+}
+
+// Add custom delegate for pinned search bar
+class _SliverSearchBarDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+
+  _SliverSearchBarDelegate({required this.child});
+
+  @override
+  double get minExtent => 80;
+
+  @override
+  double get maxExtent => 80;
+
+  @override
+  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) {
+    return true;
+  }
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return child;
   }
 }

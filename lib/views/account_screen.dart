@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../constants/app_colors.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
@@ -16,11 +17,16 @@ class AccountScreen extends StatefulWidget {
 
   const AccountScreen({Key? key, this.onProfileImageChanged}) : super(key: key);
 
+  // Add route observer for detecting navigation
+  static final RouteObserver<PageRoute> routeObserver =
+      RouteObserver<PageRoute>();
+
   @override
   State<AccountScreen> createState() => _AccountScreenState();
 }
 
-class _AccountScreenState extends State<AccountScreen> {
+class _AccountScreenState extends State<AccountScreen>
+    with TickerProviderStateMixin, RouteAware {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final ImagePicker _imagePicker = ImagePicker();
@@ -38,12 +44,198 @@ class _AccountScreenState extends State<AccountScreen> {
       'organizer_profile_image_path';
   bool _isOrganizer = false;
 
+  // Animation controllers
+  late AnimationController _profileAnimController;
+  late AnimationController _titleAnimController;
+  late AnimationController _containerAnimController;
+
+  // Animations
+  late Animation<Offset> _profileSlideAnim;
+  late Animation<double> _profileFadeAnim;
+  late Animation<Offset> _titleSlideAnim;
+  late Animation<double> _titleFadeAnim;
+
+  // Container animations list
+  List<Animation<Offset>> _containerSlideAnims = [];
+  List<Animation<double>> _containerFadeAnims = [];
+
   @override
   void initState() {
     super.initState();
     _loadUserData();
     _checkUserType();
     _clearCrossOverProfileImages();
+
+    // Initialize animation controllers
+    _setupAnimations();
+  }
+
+  // Add function to restart animations
+  void _restartAnimations() {
+    // Reset animations to the beginning
+    _profileAnimController.reset();
+    _titleAnimController.reset();
+    _containerAnimController.reset();
+
+    // Start the animations with staggered timing
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) _profileAnimController.forward();
+    });
+
+    Future.delayed(const Duration(milliseconds: 700), () {
+      if (mounted) _titleAnimController.forward();
+    });
+
+    Future.delayed(const Duration(milliseconds: 1100), () {
+      if (mounted) _containerAnimController.forward();
+    });
+  }
+
+  void _setupAnimations() {
+    // Profile animation controller - increased duration
+    _profileAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000), // Increased from 800ms
+    );
+
+    // Title animation controller - increased duration
+    _titleAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000), // Increased from 800ms
+    );
+
+    // Container animation controller - longer duration for staggered effect
+    _containerAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500), // Increased from 1200ms
+    );
+
+    // Profile animations - gentler curves
+    _profileSlideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.2), // Reduced offset for subtler motion
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _profileAnimController,
+        curve:
+            Curves.easeOutQuart, // Changed to easeOutQuart for smoother finish
+      ),
+    );
+
+    _profileFadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _profileAnimController,
+        curve: Curves.easeInOut, // Changed to easeInOut for smoother transition
+      ),
+    );
+
+    // Title animations - gentler curves
+    _titleSlideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.2), // Reduced offset for subtler motion
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _titleAnimController,
+        curve:
+            Curves.easeOutQuart, // Changed to easeOutQuart for smoother finish
+      ),
+    );
+
+    _titleFadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _titleAnimController,
+        curve: Curves.easeInOut, // Changed to easeInOut for smoother transition
+      ),
+    );
+
+    // Create staggered animations for the 4 info containers
+    for (int i = 0; i < 4; i++) {
+      // More gradual staggering with smaller interval
+      final startInterval =
+          0.1 * i; // Changed from 0.15 for smoother transition
+      // Make sure endInterval never exceeds 1.0
+      final endInterval = min(
+        startInterval + 0.8,
+        1.0,
+      ); // Increased from 0.7 for longer fade
+
+      _containerSlideAnims.add(
+        Tween<Offset>(
+          begin: const Offset(0, 0.2), // Reduced from 0.3 for subtler motion
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(
+            parent: _containerAnimController,
+            curve: Interval(
+              startInterval,
+              endInterval,
+              curve:
+                  Curves
+                      .easeOutQuart, // Using easeOutQuart for consistent animation style
+            ),
+          ),
+        ),
+      );
+
+      _containerFadeAnims.add(
+        Tween<double>(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(
+            parent: _containerAnimController,
+            curve: Interval(
+              startInterval,
+              endInterval,
+              curve:
+                  Curves
+                      .easeInOut, // Changed to easeInOut for smoother transition
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Start animations with longer delays to match client home screen
+    Future.delayed(const Duration(milliseconds: 300), () {
+      // Increased from 100ms
+      if (mounted) _profileAnimController.forward();
+    });
+
+    Future.delayed(const Duration(milliseconds: 700), () {
+      // Increased from 300ms
+      if (mounted) _titleAnimController.forward();
+    });
+
+    Future.delayed(const Duration(milliseconds: 1100), () {
+      // Increased from 500ms
+      if (mounted) _containerAnimController.forward();
+    });
+  }
+
+  @override
+  void didPopNext() {
+    super.didPopNext();
+    // Restart animations when returning to this screen
+    _restartAnimations();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Register with the route observer
+    AccountScreen.routeObserver.subscribe(
+      this,
+      ModalRoute.of(context) as PageRoute,
+    );
+  }
+
+  @override
+  void dispose() {
+    // Unsubscribe from route observer
+    AccountScreen.routeObserver.unsubscribe(this);
+
+    _profileAnimController.dispose();
+    _titleAnimController.dispose();
+    _containerAnimController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUserData() async {
@@ -598,10 +790,6 @@ class _AccountScreenState extends State<AccountScreen> {
                     ),
                   ),
                   const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.refresh, color: Colors.white),
-                    onPressed: _loadUserData,
-                  ),
                 ],
               ),
             ),
@@ -624,318 +812,342 @@ class _AccountScreenState extends State<AccountScreen> {
                             Center(
                               child: Column(
                                 children: [
-                                  Stack(
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 50,
-                                        backgroundColor: Colors.grey[200],
-                                        backgroundImage:
-                                            _profileImage != null
-                                                ? FileImage(_profileImage!)
-                                                : null,
-                                        child:
-                                            _profileImage == null
-                                                ? Text(
-                                                  _displayName.isNotEmpty
-                                                      ? _displayName[0]
-                                                          .toUpperCase()
-                                                      : 'U',
-                                                  style: const TextStyle(
-                                                    color: Colors.black,
-                                                    fontSize: 40,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                )
-                                                : null,
-                                      ),
+                                  FadeTransition(
+                                    opacity: _profileFadeAnim,
+                                    child: SlideTransition(
+                                      position: _profileSlideAnim,
+                                      child: Stack(
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 50,
+                                            backgroundColor: Colors.grey[200],
+                                            backgroundImage:
+                                                _profileImage != null
+                                                    ? FileImage(_profileImage!)
+                                                    : null,
+                                            child:
+                                                _profileImage == null
+                                                    ? Text(
+                                                      _displayName.isNotEmpty
+                                                          ? _displayName[0]
+                                                              .toUpperCase()
+                                                          : 'U',
+                                                      style: const TextStyle(
+                                                        color: Colors.black,
+                                                        fontSize: 40,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    )
+                                                    : null,
+                                          ),
 
-                                      // Camera icon
-                                      Positioned(
-                                        bottom: 0,
-                                        right: 0,
-                                        child: GestureDetector(
-                                          onTap: () {
-                                            // Show a compact profile photo picker
-                                            showModalBottomSheet(
-                                              context: context,
-                                              backgroundColor:
-                                                  Colors.transparent,
-                                              isScrollControlled: true,
-                                              builder: (BuildContext context) {
-                                                return Container(
-                                                  padding:
-                                                      const EdgeInsets.fromLTRB(
-                                                        0,
-                                                        12,
-                                                        0,
-                                                        20,
-                                                      ),
-                                                  decoration: const BoxDecoration(
-                                                    color:
-                                                        AppColors
-                                                            .creamBackground, // App cream background
-                                                    borderRadius:
-                                                        BorderRadius.only(
-                                                          topLeft:
-                                                              Radius.circular(
-                                                                16,
-                                                              ),
-                                                          topRight:
-                                                              Radius.circular(
-                                                                16,
-                                                              ),
-                                                        ),
-                                                    boxShadow: [
-                                                      BoxShadow(
-                                                        color: Colors.black12,
-                                                        blurRadius: 8,
-                                                        spreadRadius: 0,
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  child: Column(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: <Widget>[
-                                                      // Drag handle
-                                                      Container(
-                                                        width: 36,
-                                                        height: 4,
-                                                        margin:
-                                                            const EdgeInsets.only(
-                                                              bottom: 8,
-                                                            ),
-                                                        decoration: BoxDecoration(
-                                                          color:
-                                                              Colors
-                                                                  .grey
-                                                                  .shade300,
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                2,
-                                                              ),
-                                                        ),
-                                                      ),
-
-                                                      // Title
-                                                      const Text(
-                                                        'Profile photo',
-                                                        style: TextStyle(
-                                                          fontSize: 16,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          color: Colors.black87,
-                                                        ),
-                                                      ),
-
-                                                      const SizedBox(
-                                                        height: 16,
-                                                      ),
-
-                                                      // Option buttons
-                                                      Row(
-                                                        mainAxisAlignment:
-                                                            MainAxisAlignment
-                                                                .center,
-                                                        children: [
-                                                          // Camera option
-                                                          Padding(
-                                                            padding:
-                                                                const EdgeInsets.symmetric(
-                                                                  horizontal:
-                                                                      16,
-                                                                ),
-                                                            child: Column(
-                                                              children: [
-                                                                GestureDetector(
-                                                                  onTap: () {
-                                                                    Navigator.of(
-                                                                      context,
-                                                                    ).pop();
-                                                                    _pickImage(
-                                                                      ImageSource
-                                                                          .camera,
-                                                                    );
-                                                                  },
-                                                                  child: Container(
-                                                                    width: 55,
-                                                                    height: 55,
-                                                                    decoration: BoxDecoration(
-                                                                      shape:
-                                                                          BoxShape
-                                                                              .circle,
-                                                                      border: Border.all(
-                                                                        color:
-                                                                            Colors.black87, // Black outline
-                                                                        width:
-                                                                            1.0,
-                                                                      ),
-                                                                    ),
-                                                                    child: const Center(
-                                                                      child: Icon(
-                                                                        Icons
-                                                                            .camera_alt_rounded,
-                                                                        color:
-                                                                            Colors.black87,
-                                                                        size:
-                                                                            22,
-                                                                      ),
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                                const SizedBox(
-                                                                  height: 6,
-                                                                ),
-                                                                const Text(
-                                                                  'Camera',
-                                                                  style: TextStyle(
-                                                                    color:
-                                                                        Colors
-                                                                            .black87,
-                                                                    fontSize:
-                                                                        13,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w500,
-                                                                  ),
-                                                                ),
-                                                              ],
-                                                            ),
+                                          // Camera icon
+                                          Positioned(
+                                            bottom: 0,
+                                            right: 0,
+                                            child: GestureDetector(
+                                              onTap: () {
+                                                // Show a compact profile photo picker
+                                                showModalBottomSheet(
+                                                  context: context,
+                                                  backgroundColor:
+                                                      Colors.transparent,
+                                                  isScrollControlled: true,
+                                                  builder: (
+                                                    BuildContext context,
+                                                  ) {
+                                                    return Container(
+                                                      padding:
+                                                          const EdgeInsets.fromLTRB(
+                                                            0,
+                                                            12,
+                                                            0,
+                                                            20,
                                                           ),
-
-                                                          // Gallery option
-                                                          Padding(
-                                                            padding:
-                                                                const EdgeInsets.symmetric(
-                                                                  horizontal:
-                                                                      16,
-                                                                ),
-                                                            child: Column(
-                                                              children: [
-                                                                GestureDetector(
-                                                                  onTap: () {
-                                                                    Navigator.of(
-                                                                      context,
-                                                                    ).pop();
-                                                                    _pickImage(
-                                                                      ImageSource
-                                                                          .gallery,
-                                                                    );
-                                                                  },
-                                                                  child: Container(
-                                                                    width: 55,
-                                                                    height: 55,
-                                                                    decoration: BoxDecoration(
-                                                                      shape:
-                                                                          BoxShape
-                                                                              .circle,
-                                                                      border: Border.all(
-                                                                        color:
-                                                                            Colors.black87, // Black outline
-                                                                        width:
-                                                                            1.0,
-                                                                      ),
-                                                                    ),
-                                                                    child: const Center(
-                                                                      child: Icon(
-                                                                        Icons
-                                                                            .photo_library_rounded,
-                                                                        color:
-                                                                            Colors.black87,
-                                                                        size:
-                                                                            22,
-                                                                      ),
-                                                                    ),
+                                                      decoration: const BoxDecoration(
+                                                        color:
+                                                            AppColors
+                                                                .creamBackground, // App cream background
+                                                        borderRadius:
+                                                            BorderRadius.only(
+                                                              topLeft:
+                                                                  Radius.circular(
+                                                                    16,
                                                                   ),
-                                                                ),
-                                                                const SizedBox(
-                                                                  height: 6,
-                                                                ),
-                                                                const Text(
-                                                                  'Gallery',
-                                                                  style: TextStyle(
-                                                                    color:
-                                                                        Colors
-                                                                            .black87,
-                                                                    fontSize:
-                                                                        13,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w500,
+                                                              topRight:
+                                                                  Radius.circular(
+                                                                    16,
                                                                   ),
-                                                                ),
-                                                              ],
                                                             ),
+                                                        boxShadow: [
+                                                          BoxShadow(
+                                                            color:
+                                                                Colors.black12,
+                                                            blurRadius: 8,
+                                                            spreadRadius: 0,
                                                           ),
                                                         ],
                                                       ),
+                                                      child: Column(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: <Widget>[
+                                                          // Drag handle
+                                                          Container(
+                                                            width: 36,
+                                                            height: 4,
+                                                            margin:
+                                                                const EdgeInsets.only(
+                                                                  bottom: 8,
+                                                                ),
+                                                            decoration: BoxDecoration(
+                                                              color:
+                                                                  Colors
+                                                                      .grey
+                                                                      .shade300,
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    2,
+                                                                  ),
+                                                            ),
+                                                          ),
 
-                                                      const SizedBox(
-                                                        height: 16,
-                                                      ),
+                                                          // Title
+                                                          const Text(
+                                                            'Profile photo',
+                                                            style: TextStyle(
+                                                              fontSize: 16,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                              color:
+                                                                  Colors
+                                                                      .black87,
+                                                            ),
+                                                          ),
 
-                                                      // Bottom padding for safe area
-                                                      SizedBox(
-                                                        height:
-                                                            MediaQuery.of(
-                                                              context,
-                                                            ).padding.bottom,
+                                                          const SizedBox(
+                                                            height: 16,
+                                                          ),
+
+                                                          // Option buttons
+                                                          Row(
+                                                            mainAxisAlignment:
+                                                                MainAxisAlignment
+                                                                    .center,
+                                                            children: [
+                                                              // Camera option
+                                                              Padding(
+                                                                padding:
+                                                                    const EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          16,
+                                                                    ),
+                                                                child: Column(
+                                                                  children: [
+                                                                    GestureDetector(
+                                                                      onTap: () {
+                                                                        Navigator.of(
+                                                                          context,
+                                                                        ).pop();
+                                                                        _pickImage(
+                                                                          ImageSource
+                                                                              .camera,
+                                                                        );
+                                                                      },
+                                                                      child: Container(
+                                                                        width:
+                                                                            55,
+                                                                        height:
+                                                                            55,
+                                                                        decoration: BoxDecoration(
+                                                                          shape:
+                                                                              BoxShape.circle,
+                                                                          border: Border.all(
+                                                                            color:
+                                                                                Colors.black87, // Black outline
+                                                                            width:
+                                                                                1.0,
+                                                                          ),
+                                                                        ),
+                                                                        child: const Center(
+                                                                          child: Icon(
+                                                                            Icons.camera_alt_rounded,
+                                                                            color:
+                                                                                Colors.black87,
+                                                                            size:
+                                                                                22,
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                    const SizedBox(
+                                                                      height: 6,
+                                                                    ),
+                                                                    const Text(
+                                                                      'Camera',
+                                                                      style: TextStyle(
+                                                                        color:
+                                                                            Colors.black87,
+                                                                        fontSize:
+                                                                            13,
+                                                                        fontWeight:
+                                                                            FontWeight.w500,
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+
+                                                              // Gallery option
+                                                              Padding(
+                                                                padding:
+                                                                    const EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          16,
+                                                                    ),
+                                                                child: Column(
+                                                                  children: [
+                                                                    GestureDetector(
+                                                                      onTap: () {
+                                                                        Navigator.of(
+                                                                          context,
+                                                                        ).pop();
+                                                                        _pickImage(
+                                                                          ImageSource
+                                                                              .gallery,
+                                                                        );
+                                                                      },
+                                                                      child: Container(
+                                                                        width:
+                                                                            55,
+                                                                        height:
+                                                                            55,
+                                                                        decoration: BoxDecoration(
+                                                                          shape:
+                                                                              BoxShape.circle,
+                                                                          border: Border.all(
+                                                                            color:
+                                                                                Colors.black87, // Black outline
+                                                                            width:
+                                                                                1.0,
+                                                                          ),
+                                                                        ),
+                                                                        child: const Center(
+                                                                          child: Icon(
+                                                                            Icons.photo_library_rounded,
+                                                                            color:
+                                                                                Colors.black87,
+                                                                            size:
+                                                                                22,
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                    const SizedBox(
+                                                                      height: 6,
+                                                                    ),
+                                                                    const Text(
+                                                                      'Gallery',
+                                                                      style: TextStyle(
+                                                                        color:
+                                                                            Colors.black87,
+                                                                        fontSize:
+                                                                            13,
+                                                                        fontWeight:
+                                                                            FontWeight.w500,
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+
+                                                          const SizedBox(
+                                                            height: 16,
+                                                          ),
+
+                                                          // Bottom padding for safe area
+                                                          SizedBox(
+                                                            height:
+                                                                MediaQuery.of(
+                                                                      context,
+                                                                    )
+                                                                    .padding
+                                                                    .bottom,
+                                                          ),
+                                                        ],
                                                       ),
-                                                    ],
-                                                  ),
+                                                    );
+                                                  },
                                                 );
                                               },
-                                            );
-                                          },
-                                          child: Container(
-                                            padding: const EdgeInsets.all(4),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF9D9DCC),
-                                              shape: BoxShape.circle,
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Colors.black
-                                                      .withOpacity(0.1),
-                                                  blurRadius: 4,
-                                                  offset: const Offset(0, 2),
+                                              child: Container(
+                                                padding: const EdgeInsets.all(
+                                                  4,
                                                 ),
-                                              ],
-                                            ),
-                                            child: const Icon(
-                                              Icons.camera_alt,
-                                              color: Colors.white,
-                                              size: 16,
+                                                decoration: BoxDecoration(
+                                                  color: const Color(
+                                                    0xFF9D9DCC,
+                                                  ),
+                                                  shape: BoxShape.circle,
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: Colors.black
+                                                          .withOpacity(0.1),
+                                                      blurRadius: 4,
+                                                      offset: const Offset(
+                                                        0,
+                                                        2,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                child: const Icon(
+                                                  Icons.camera_alt,
+                                                  color: Colors.white,
+                                                  size: 16,
+                                                ),
+                                              ),
                                             ),
                                           ),
-                                        ),
+                                        ],
                                       ),
-                                    ],
+                                    ),
                                   ),
                                   const SizedBox(height: 10),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    children: [
-                                      Container(
-                                        width: 3,
-                                        height: 24,
-                                        decoration: BoxDecoration(
-                                          color: Colors.black87,
-                                          borderRadius: BorderRadius.circular(
-                                            1.5,
+                                  FadeTransition(
+                                    opacity: _titleFadeAnim,
+                                    child: SlideTransition(
+                                      position: _titleSlideAnim,
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            width: 3,
+                                            height: 24,
+                                            decoration: BoxDecoration(
+                                              color: Colors.black87,
+                                              borderRadius:
+                                                  BorderRadius.circular(1.5),
+                                            ),
                                           ),
-                                        ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Personal Info',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.black87,
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Personal Info',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black87,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                    ],
+                                    ),
                                   ),
                                 ],
                               ),
@@ -944,43 +1156,67 @@ class _AccountScreenState extends State<AccountScreen> {
                             const SizedBox(height: 24),
 
                             // Name container
-                            _buildInfoContainer(
-                              title: 'Name',
-                              value: _displayName,
-                              icon: Icons.person_outline,
-                              onEdit: _showNameEditScreen,
+                            FadeTransition(
+                              opacity: _containerFadeAnims[0],
+                              child: SlideTransition(
+                                position: _containerSlideAnims[0],
+                                child: _buildInfoContainer(
+                                  title: 'Name',
+                                  value: _displayName,
+                                  icon: Icons.person_outline,
+                                  onEdit: _showNameEditScreen,
+                                ),
+                              ),
                             ),
 
                             const SizedBox(height: 16),
 
                             // Email container
-                            _buildInfoContainer(
-                              title: 'Email',
-                              value: _email,
-                              icon: Icons.email_outlined,
-                              onEdit: _showEmailEditScreen,
+                            FadeTransition(
+                              opacity: _containerFadeAnims[1],
+                              child: SlideTransition(
+                                position: _containerSlideAnims[1],
+                                child: _buildInfoContainer(
+                                  title: 'Email',
+                                  value: _email,
+                                  icon: Icons.email_outlined,
+                                  onEdit: _showEmailEditScreen,
+                                ),
+                              ),
                             ),
 
                             const SizedBox(height: 16),
 
                             // Password container
-                            _buildInfoContainer(
-                              title: 'Password',
-                              value: _password,
-                              icon: Icons.lock_outline,
-                              onEdit: _showPasswordChangeDialog,
+                            FadeTransition(
+                              opacity: _containerFadeAnims[2],
+                              child: SlideTransition(
+                                position: _containerSlideAnims[2],
+                                child: _buildInfoContainer(
+                                  title: 'Password',
+                                  value: _password,
+                                  icon: Icons.lock_outline,
+                                  onEdit: _showPasswordChangeDialog,
+                                ),
+                              ),
                             ),
 
                             const SizedBox(height: 16),
 
                             // Phone number container
-                            _buildInfoContainer(
-                              title: 'Mobile Number',
-                              value: _phoneNumber,
-                              icon: Icons.phone_outlined,
-                              onEdit: () {
-                                // Will be implemented later
-                              },
+                            FadeTransition(
+                              opacity: _containerFadeAnims[3],
+                              child: SlideTransition(
+                                position: _containerSlideAnims[3],
+                                child: _buildInfoContainer(
+                                  title: 'Mobile Number',
+                                  value: _phoneNumber,
+                                  icon: Icons.phone_outlined,
+                                  onEdit: () {
+                                    // Will be implemented later
+                                  },
+                                ),
+                              ),
                             ),
                           ],
                         ),

@@ -5,6 +5,7 @@ import '../../models/response_model.dart';
 import '../../services/portfolio_service.dart';
 import '../../views/client_home_screen.dart';
 import '../../constants/app_colors.dart';
+import 'payment_success_screen.dart';
 import 'package:uuid/uuid.dart';
 
 class PaymentScreen extends StatefulWidget {
@@ -164,17 +165,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
         await _portfolioService.createResponse(response);
         print('Successfully created response in Firestore');
 
-        // Replace navigation to go directly to client home screen
+        // Navigate to success screen with confetti animation
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const ClientHomeScreen()),
-          (route) => false,
-        );
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Order placed successfully'),
-            backgroundColor: Colors.green,
+          MaterialPageRoute(
+            builder:
+                (context) => PaymentSuccessScreen(eventName: widget.eventName),
           ),
+          (route) => false,
         );
       } catch (e) {
         print('Error submitting payment: $e');

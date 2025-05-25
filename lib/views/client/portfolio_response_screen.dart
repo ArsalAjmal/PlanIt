@@ -37,7 +37,6 @@ class _PortfolioResponseScreenState extends State<PortfolioResponseScreen> {
   final _addressController = TextEditingController();
   final _apartmentController = TextEditingController();
   final _cityController = TextEditingController();
-  final _phoneController = TextEditingController();
   final _portfolioService = PortfolioService();
   DateTime? _selectedDate;
   String _selectedEventType = '';
@@ -46,63 +45,6 @@ class _PortfolioResponseScreenState extends State<PortfolioResponseScreen> {
   bool _needsPhotographer = false;
   bool _isLoading = false;
   final double _photographerFee = 25000.0; // PKR 25,000 for photographer
-  String _selectedCountryCode = '+92'; // Default to Pakistan
-  String? _phoneErrorText; // Track phone validation error
-
-  // Country codes list
-  final List<Map<String, dynamic>> _countryCodes = [
-    {
-      'code': '+92',
-      'name': 'Pakistan',
-      'flag': '🇵🇰',
-      'digits': 10,
-      'pattern': 'Starting with 3',
-    },
-    {
-      'code': '+91',
-      'name': 'India',
-      'flag': '🇮🇳',
-      'digits': 10,
-      'pattern': 'Starting with 6, 7, 8, or 9',
-    },
-    {
-      'code': '+1',
-      'name': 'USA',
-      'flag': '🇺🇸',
-      'digits': 10,
-      'pattern': 'Area code + 7 digits',
-    },
-    {
-      'code': '+44',
-      'name': 'UK',
-      'flag': '🇬🇧',
-      'digits': 10,
-      'pattern': 'Without leading 0',
-    },
-    {
-      'code': '+971',
-      'name': 'UAE',
-      'flag': '🇦🇪',
-      'digits': 9,
-      'pattern': 'Starting with 2, 4, or 5',
-    },
-    {
-      'code': '+966',
-      'name': 'Saudi Arabia',
-      'flag': '🇸🇦',
-      'digits': 9,
-      'pattern': 'Starting with 5 for mobile',
-    },
-  ];
-
-  // Get expected phone digit length based on country code
-  int get _expectedPhoneDigits {
-    final country = _countryCodes.firstWhere(
-      (country) => country['code'] == _selectedCountryCode,
-      orElse: () => {'digits': 10},
-    );
-    return country['digits'] as int;
-  }
 
   // For rating and event count caching
   double _portfolioRating = 0.0;
@@ -116,9 +58,6 @@ class _PortfolioResponseScreenState extends State<PortfolioResponseScreen> {
     _portfolioRating = widget.portfolio.rating;
     _eventCount = widget.portfolio.totalEvents;
     _loadPortfolioRating();
-
-    // Add listener for phone validation
-    _phoneController.addListener(_validatePhoneOnChange);
   }
 
   Future<void> _loadPortfolioRating() async {
@@ -176,8 +115,6 @@ class _PortfolioResponseScreenState extends State<PortfolioResponseScreen> {
     _addressController.dispose();
     _apartmentController.dispose();
     _cityController.dispose();
-    _phoneController.removeListener(_validatePhoneOnChange);
-    _phoneController.dispose();
     super.dispose();
   }
 
@@ -224,10 +161,6 @@ class _PortfolioResponseScreenState extends State<PortfolioResponseScreen> {
     if (_formKey.currentState!.validate() && _selectedDate != null) {
       final totalAmount = _calculateTotalAmount();
 
-      // Clean up phone number and format with country code
-      final cleanedPhone = _phoneController.text;
-      final formattedPhone = '$_selectedCountryCode$cleanedPhone';
-
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -250,7 +183,7 @@ class _PortfolioResponseScreenState extends State<PortfolioResponseScreen> {
                 address: _addressController.text,
                 apartment: _apartmentController.text,
                 city: _cityController.text,
-                phoneNumber: formattedPhone,
+                phoneNumber: '',
               ),
         ),
       );
@@ -286,101 +219,6 @@ class _PortfolioResponseScreenState extends State<PortfolioResponseScreen> {
         );
       },
     );
-  }
-
-  String _getPhoneHint() {
-    final country = _countryCodes.firstWhere(
-      (country) => country['code'] == _selectedCountryCode,
-      orElse: () => {'pattern': 'Unknown'},
-    );
-    return country['pattern'] as String;
-  }
-
-  // Validates phone number on change and updates error text
-  void _validatePhoneOnChange() {
-    if (_phoneController.text.isEmpty) {
-      setState(() {
-        _phoneErrorText = null;
-      });
-      return;
-    }
-
-    // Get digits only (should be the same as text now that we removed spacing)
-    final digitsOnly = _phoneController.text;
-
-    // Get country-specific validation rules
-    final country = _countryCodes.firstWhere(
-      (c) => c['code'] == _selectedCountryCode,
-      orElse: () => {'digits': 10, 'name': 'Unknown'},
-    );
-
-    final expectedDigits = country['digits'] as int;
-    bool isValid = true;
-
-    // Check for invalid starting digits early on
-    if (digitsOnly.isNotEmpty) {
-      // Pakistan mobile validation
-      if (_selectedCountryCode == '+92' && !digitsOnly.startsWith('3')) {
-        isValid = false;
-      }
-      // India mobile validation
-      else if (_selectedCountryCode == '+91' &&
-          digitsOnly.isNotEmpty &&
-          !digitsOnly.startsWith('9') &&
-          !digitsOnly.startsWith('8') &&
-          !digitsOnly.startsWith('7') &&
-          !digitsOnly.startsWith('6')) {
-        isValid = false;
-      }
-      // UAE number validation
-      else if (_selectedCountryCode == '+971' &&
-          digitsOnly.isNotEmpty &&
-          !digitsOnly.startsWith('5') &&
-          !digitsOnly.startsWith('4') &&
-          !digitsOnly.startsWith('2')) {
-        isValid = false;
-      }
-      // Saudi Arabia validation
-      else if (_selectedCountryCode == '+966' &&
-          digitsOnly.isNotEmpty &&
-          !digitsOnly.startsWith('5')) {
-        isValid = false;
-      }
-    }
-
-    // Handle length validation
-    if (isValid) {
-      if (digitsOnly.length < expectedDigits) {
-        // No error yet, still typing
-        isValid = false; // Not valid until we have enough digits
-      } else if (digitsOnly.length > expectedDigits) {
-        isValid = false;
-      }
-    }
-
-    // Set a simple, consistent error message
-    String? error = isValid ? null : "Invalid phone number";
-
-    setState(() {
-      _phoneErrorText = error;
-    });
-  }
-
-  bool _isPhoneValid() {
-    if (_phoneController.text.isEmpty) {
-      return false;
-    }
-
-    // Check if there are no validation errors and the phone number is complete
-    final digitsOnly = _phoneController.text;
-    final country = _countryCodes.firstWhere(
-      (c) => c['code'] == _selectedCountryCode,
-      orElse: () => {'digits': 10, 'name': 'Unknown'},
-    );
-    final expectedDigits = country['digits'] as int;
-
-    // Must have right number of digits and no error text
-    return digitsOnly.length == expectedDigits && _phoneErrorText == null;
   }
 
   @override
@@ -826,194 +664,6 @@ class _PortfolioResponseScreenState extends State<PortfolioResponseScreen> {
                                         }
                                         return null;
                                       },
-                                    ),
-
-                                    const SizedBox(height: 16),
-
-                                    // Phone Number Field with Country Code
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        // Country code dropdown
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.grey.withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          width: 120,
-                                          child: DropdownButtonFormField<
-                                            String
-                                          >(
-                                            decoration: InputDecoration(
-                                              contentPadding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 10,
-                                                    vertical: 10,
-                                                  ),
-                                              border: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                                borderSide: BorderSide.none,
-                                              ),
-                                              enabledBorder: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                                borderSide: BorderSide.none,
-                                              ),
-                                              focusedBorder: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                                borderSide: const BorderSide(
-                                                  color: Color(0xFF9D9DCC),
-                                                  width: 1,
-                                                ),
-                                              ),
-                                            ),
-                                            value: _selectedCountryCode,
-                                            items:
-                                                _countryCodes.map((country) {
-                                                  return DropdownMenuItem<
-                                                    String
-                                                  >(
-                                                    value: country['code'],
-                                                    child: Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.min,
-                                                      children: [
-                                                        Text(country['flag']),
-                                                        const SizedBox(
-                                                          width: 4,
-                                                        ),
-                                                        Text(country['code']),
-                                                      ],
-                                                    ),
-                                                  );
-                                                }).toList(),
-                                            onChanged: (value) {
-                                              if (value != null) {
-                                                setState(() {
-                                                  _selectedCountryCode = value;
-                                                  // Clear phone field when country changes
-                                                  _phoneController.clear();
-                                                  // Clear error text
-                                                  _phoneErrorText = null;
-                                                });
-                                              }
-                                            },
-                                            dropdownColor: Colors.white,
-                                          ),
-                                        ),
-
-                                        const SizedBox(width: 8),
-
-                                        // Phone number field
-                                        Expanded(
-                                          child: TextFormField(
-                                            controller: _phoneController,
-                                            decoration: InputDecoration(
-                                              labelText: 'Phone Number',
-                                              hintText: _getPhoneHint(),
-                                              hintStyle: TextStyle(
-                                                color: Colors.grey[600],
-                                                fontSize: 16,
-                                              ),
-                                              filled: true,
-                                              fillColor: Colors.grey
-                                                  .withOpacity(0.1),
-                                              labelStyle: TextStyle(
-                                                color: Colors.grey[600],
-                                                fontSize: 16,
-                                              ),
-                                              prefixIcon: const Icon(
-                                                Icons.phone,
-                                                color: Color(0xFF9D9DCC),
-                                                size: 20,
-                                              ),
-                                              suffixIcon:
-                                                  _isPhoneValid()
-                                                      ? const Icon(
-                                                        Icons.check_circle,
-                                                        color: Colors.green,
-                                                        size: 20,
-                                                      )
-                                                      : null,
-                                              contentPadding:
-                                                  const EdgeInsets.symmetric(
-                                                    vertical: 10.0,
-                                                    horizontal: 12.0,
-                                                  ),
-                                              border: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                                borderSide: BorderSide.none,
-                                              ),
-                                              enabledBorder: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                                borderSide: BorderSide.none,
-                                              ),
-                                              focusedBorder: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                                borderSide: const BorderSide(
-                                                  color: Color(0xFF9D9DCC),
-                                                  width: 1,
-                                                ),
-                                              ),
-                                              errorText: _phoneErrorText,
-                                              isDense: true,
-                                            ),
-                                            keyboardType: TextInputType.phone,
-                                            style: const TextStyle(
-                                              color: Colors.black87,
-                                              fontSize: 16,
-                                            ),
-                                            inputFormatters: [
-                                              PhoneNumberInputFormatter(
-                                                _expectedPhoneDigits,
-                                              ),
-                                            ],
-                                            validator: (value) {
-                                              if (value == null ||
-                                                  value.isEmpty) {
-                                                return 'Please enter your phone number';
-                                              }
-
-                                              // Simply validate the phone number according to our real-time validation
-                                              final digitsOnly = value
-                                                  .replaceAll(
-                                                    RegExp(r'\D'),
-                                                    '',
-                                                  );
-
-                                              // Get expected digits for this country
-                                              final expectedDigits =
-                                                  _countryCodes.firstWhere(
-                                                        (c) =>
-                                                            c['code'] ==
-                                                            _selectedCountryCode,
-                                                        orElse:
-                                                            () => {
-                                                              'digits': 10,
-                                                            },
-                                                      )['digits']
-                                                      as int;
-
-                                              // Check if the length matches
-                                              if (digitsOnly.length !=
-                                                  expectedDigits) {
-                                                return 'Invalid phone number';
-                                              }
-
-                                              // Return the current error text if there is one
-                                              return _phoneErrorText;
-                                            },
-                                          ),
-                                        ),
-                                      ],
                                     ),
 
                                     const SizedBox(height: 16),
@@ -1845,37 +1495,6 @@ class _PortfolioResponseScreenState extends State<PortfolioResponseScreen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-// Custom formatter for phone numbers
-class PhoneNumberInputFormatter extends TextInputFormatter {
-  final int digitsLimit;
-
-  PhoneNumberInputFormatter(this.digitsLimit);
-
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    if (newValue.text.isEmpty) {
-      return newValue;
-    }
-
-    // Strip non-digit characters
-    final digitsOnly = newValue.text.replaceAll(RegExp(r'\D'), '');
-
-    // Truncate if longer than limit
-    final truncatedDigits =
-        digitsOnly.length > digitsLimit
-            ? digitsOnly.substring(0, digitsLimit)
-            : digitsOnly;
-
-    return TextEditingValue(
-      text: truncatedDigits,
-      selection: TextSelection.collapsed(offset: truncatedDigits.length),
     );
   }
 }

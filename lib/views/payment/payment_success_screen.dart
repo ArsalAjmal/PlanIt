@@ -6,7 +6,7 @@ import '../../constants/app_colors.dart';
 
 class PaymentSuccessScreen extends StatefulWidget {
   final String eventName;
-
+  //checking commit
   const PaymentSuccessScreen({Key? key, required this.eventName})
     : super(key: key);
 
@@ -72,7 +72,7 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> {
                   ),
                   const SizedBox(height: 32),
                   const Text(
-                    'Check order history section for updates about your order',
+                    'Check order history section for more updates about your order',
                     style: TextStyle(fontSize: 16, color: Colors.black54),
                     textAlign: TextAlign.center,
                   ),

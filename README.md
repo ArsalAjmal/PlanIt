@@ -84,18 +84,6 @@ flutter pub get
 flutter run
 ```
 
-## 📁 Project Structure
-
-Project Structure:
-├── models/         # Data models
-├── views/          # UI components
-├── controllers/    # Business logic
-├── services/       # External service integrations
-├── providers/      # State management
-├── utils/          # Utility functions
-└── constants/      # Application constants
-
-
 ## ⚙️ Configuration
 
 ### Environment Setup

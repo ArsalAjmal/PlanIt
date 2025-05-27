@@ -1,7 +1,7 @@
 # PlanIt - Event Planning Platform
 
 <div align="center">
-  <img src="assets/images/logo.png" alt="PlanIt Logo" width="200"/>
+  <img src="assets/images/newlogo3.png" alt="PlanIt Logo" width="200"/>
 </div>
 
 ## 📱 Overview

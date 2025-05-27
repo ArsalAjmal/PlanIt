@@ -1,6 +1,8 @@
 # PlanIt - Event Planning Platform
 
-![PlanIt Logo](assets/logo.png)
+<div align="center">
+  <img src="assets/images/logo.png" alt="PlanIt Logo" width="200"/>
+</div>
 
 ## 📱 Overview
 PlanIt is a modern event planning platform that seamlessly connects clients with professional event organizers. Built with Flutter, it provides a robust solution for event planning, management, and coordination.

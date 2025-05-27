@@ -85,15 +85,104 @@ flutter run
 ```
 
 ## 📁 Project Structure
-lib/
-├── controllers/ # Business logic
-├── models/ # Data models
-├── views/ # UI components
-├── services/ # External services
-├── providers/ # State management
-├── utils/ # Utility functions
-└── constants/ # Application constants
-
+planit/
+├── android/                    # Android specific files
+├── ios/                       # iOS specific files
+├── lib/                       # Main application code
+│   ├── controllers/           # Business logic controllers
+│   │   ├── auth_controller.dart
+│   │   ├── booking_controller.dart
+│   │   ├── organizer_controller.dart
+│   │   └── user_controller.dart
+│   │
+│   ├── models/               # Data models
+│   │   ├── user_model.dart
+│   │   ├── booking_model.dart
+│   │   ├── organizer_model.dart
+│   │   ├── portfolio_model.dart
+│   │   └── review_model.dart
+│   │
+│   ├── views/                # UI screens
+│   │   ├── auth/
+│   │   │   ├── login_view.dart
+│   │   │   ├── register_view.dart
+│   │   │   └── forgot_password_view.dart
+│   │   │
+│   │   ├── client/
+│   │   │   ├── client_home_view.dart
+│   │   │   ├── search_view.dart
+│   │   │   ├── booking_view.dart
+│   │   │   └── profile_view.dart
+│   │   │
+│   │   ├── organizer/
+│   │   │   ├── organizer_home_view.dart
+│   │   │   ├── portfolio_view.dart
+│   │   │   ├── booking_management_view.dart
+│   │   │   └── analytics_view.dart
+│   │   │
+│   │   └── common/
+│   │       ├── splash_screen.dart
+│   │       └── error_screen.dart
+│   │
+│   ├── services/             # External services
+│   │   ├── auth_service.dart
+│   │   ├── firebase_service.dart
+│   │   ├── storage_service.dart
+│   │   └── api_service.dart
+│   │
+│   ├── providers/            # State management
+│   │   ├── auth_provider.dart
+│   │   ├── booking_provider.dart
+│   │   └── user_provider.dart
+│   │
+│   ├── utils/               # Utility functions
+│   │   ├── constants.dart
+│   │   ├── validators.dart
+│   │   ├── helpers.dart
+│   │   └── theme.dart
+│   │
+│   ├── widgets/             # Reusable widgets
+│   │   ├── common/
+│   │   │   ├── custom_button.dart
+│   │   │   ├── custom_text_field.dart
+│   │   │   └── loading_indicator.dart
+│   │   │
+│   │   ├── client/
+│   │   │   ├── booking_card.dart
+│   │   │   └── organizer_card.dart
+│   │   │
+│   │   └── organizer/
+│   │       ├── portfolio_item.dart
+│   │       └── booking_item.dart
+│   │
+│   └── main.dart            # Application entry point
+│
+├── assets/                  # Static assets
+│   ├── images/
+│   │   ├── logo.png
+│   │   └── icons/
+│   │
+│   ├── fonts/
+│   │   └── custom_fonts/
+│   │
+│   └── translations/        # Localization files
+│       ├── en.json
+│       └── es.json
+│
+├── test/                   # Test files
+│   ├── unit/
+│   ├── widget/
+│   └── integration/
+│
+├── docs/                   # Documentation
+│   ├── api/
+│   ├── setup/
+│   └── architecture/
+│
+├── .gitignore             # Git ignore file
+├── pubspec.yaml           # Flutter dependencies
+├── README.md             # Project documentation
+└── LICENSE               # License file
 
 ## ⚙️ Configuration
 

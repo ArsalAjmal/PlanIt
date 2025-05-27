@@ -83,3 +83,75 @@ flutter run
 ```
 
 ## 📁 Project Structure
+lib/
+├── controllers/ # Business logic
+├── models/ # Data models
+├── views/ # UI components
+├── services/ # External services
+├── providers/ # State management
+├── utils/ # Utility functions
+└── constants/ # Application constants
+
+
+## ⚙️ Configuration
+
+### Environment Setup
+Create a `.env` file in the root directory with:
+FIREBASE_API_KEY=your_api_key
+FIREBASE_AUTH_DOMAIN=your_auth_domain
+FIREBASE_PROJECT_ID=your_project_id
+FIREBASE_STORAGE_BUCKET=your_storage_bucket
+FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+FIREBASE_APP_ID=your_app_id
+
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📈 Roadmap
+
+- [ ] Multi-language support
+- [ ] Advanced analytics
+- [ ] Mobile app for organizers
+- [ ] Calendar integration
+- [ ] Automated event reminders
+- [ ] Social media integration
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 👥 Team
+
+- [Arsal Ajmal](https://github.com/ArsalAjmal)
+- [Mahneen Kamran Mirza](https://github.com/MahamMirza8)
+
+
+## 📞 Support
+
+- **Email**: arsal.ajmal621@gmail.com
+
+## 🙏 Acknowledgments
+
+- Flutter Team
+- Firebase Team
+- All contributors
+
+## ⭐ Show your support
+
+Give a ⭐️ if this project helped you!
+
+## 📝 Notes
+
+- Make sure to update the Firebase configuration
+- Keep your API keys secure
+- Follow the contribution guidelines
+
+---
+
+Made with ❤️ by [Arsal Ajmal](https://github.com/ArsalAjmal)
